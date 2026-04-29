@@ -35,19 +35,71 @@ spec:
             - -c
             - |
               set -eu
-              mkdir -p {{ .Values.persistence.mountPath | quote }}
+              mkdir -p {{ .Values.persistence.mountPath | quote }} {{ .Values.workspace.mountPath | quote }} {{ .Values.persistence.mountPath }}/home/bin
               cp /config-template/config.yaml {{ .Values.persistence.mountPath }}/config.yaml
+              cat > {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token <<'EOF'
+              #!/bin/sh
+              [ "${1:-get}" = "get" ] || exit 0
+              host=""
+              while IFS= read -r line; do
+                [ -n "$line" ] || break
+                case "$line" in
+                  host=*) host=${line#host=} ;;
+                esac
+              done
+              case "$host" in
+                github.com|api.github.com)
+                  token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+                  [ -n "$token" ] || exit 0
+                  printf 'username=x-access-token\n'
+                  printf 'password=%s\n' "$token"
+                  ;;
+              esac
+              EOF
+              sed -i 's/^              //' {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token
+              cat > {{ .Values.persistence.mountPath }}/home/.gitconfig <<EOF
+              [credential "https://github.com"]
+                helper = {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token
+              [credential "https://api.github.com"]
+                helper = {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token
+              EOF
+              sed -i 's/^              //' {{ .Values.persistence.mountPath }}/home/.gitconfig
+              chown -R 10000:10000 {{ .Values.workspace.mountPath | quote }} {{ .Values.persistence.mountPath }}/home
               chown 10000:10000 {{ .Values.persistence.mountPath }}/config.yaml
               chmod 600 {{ .Values.persistence.mountPath }}/config.yaml
+              chmod 700 {{ .Values.persistence.mountPath }}/home/bin
+              chmod 700 {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token
+              chmod 600 {{ .Values.persistence.mountPath }}/home/.gitconfig
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath | quote }}
             - name: config-template
               mountPath: /config-template
+        - name: install-github-cli
+          image: {{ .Values.github.cli.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              apt-get update -qq
+              apt-get install -y --no-install-recommends gh >/dev/null
+              mkdir -p {{ .Values.persistence.mountPath }}/home/bin
+              cp "$(command -v gh)" {{ .Values.persistence.mountPath }}/home/bin/gh
+              chmod 755 {{ .Values.persistence.mountPath }}/home/bin/gh
+              chown 10000:10000 {{ .Values.persistence.mountPath }}/home/bin/gh
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath | quote }}
       containers:
         - name: hermes
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: {{ .Values.workspace.mountPath | quote }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -57,8 +109,14 @@ spec:
           args:
             {{- toYaml .Values.args | nindent 12 }}
           env:
+            - name: HOME
+              value: "{{ .Values.persistence.mountPath }}/home"
+            - name: PATH
+              value: "{{ .Values.persistence.mountPath }}/home/bin:{{ .Values.persistence.mountPath }}/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
             - name: HERMES_HOME
               value: {{ .Values.persistence.mountPath | quote }}
+            - name: WORKSPACE
+              value: {{ .Values.workspace.mountPath | quote }}
             - name: HERMES_INFERENCE_PROVIDER
               value: {{ .Values.model.provider | quote }}
             - name: HERMES_MODEL
@@ -73,6 +131,16 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.copilotSecretName | quote }}
                   key: {{ .Values.secrets.copilotSecretKey | quote }}
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.githubSecretName | quote }}
+                  key: {{ .Values.secrets.githubSecretKey | quote }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.githubSecretName | quote }}
+                  key: {{ .Values.secrets.githubSecretKey | quote }}
             {{- if .Values.discord.allowedUsers }}
             - name: DISCORD_ALLOWED_USERS
               value: {{ .Values.discord.allowedUsers | quote }}
@@ -99,6 +167,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath | quote }}
+            - name: data
+              mountPath: /usr/local/bin/gh
+              subPath: home/bin/gh
+              readOnly: true
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.probes.liveness.enabled }}

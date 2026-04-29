@@ -10,7 +10,8 @@
 # Required pre-existing secrets in the cto namespace:
 #   - hermes-coder-secrets       (optional provider/tool credentials)
 #   - openclaw-discord-tokens    (key `coder` -> DISCORD_BOT_TOKEN)
-#   - cto-coder-api-keys         (key `copilot-github-token` -> COPILOT_GITHUB_TOKEN)
+#   - cto-secrets                (key `COPILOT_GITHUB_TOKEN` -> COPILOT_GITHUB_TOKEN)
+#   - cto-coder-api-keys         (key `github-pat` -> GH_TOKEN/GITHUB_TOKEN)
 #
 # Confirm Message Content + Server Members intents are ON in the Discord
 # Developer Portal for the Coder bot.
