@@ -13,7 +13,7 @@ image:
 # Upstream entrypoint bootstraps .env/config.yaml/SOUL.md from /opt/hermes/examples
 # on first start, then exec's the `hermes` CLI.
 command: ["/opt/hermes/docker/entrypoint.sh"]
-args: ["hermes", "gateway", "run"]
+args: ["hermes", "--yolo", "--accept-hooks", "gateway", "run", "--accept-hooks"]
 
 # HERMES_HOME - upstream image expects state at /opt/data.
 persistence:
@@ -69,10 +69,22 @@ model:
   provider: copilot
   default: gpt-5.5
 
+autonomy:
+  maxTurns: 90
+  approvalsMode: "off"
+  hooksAutoAccept: true
+  cronMode: approve
+
 configYaml: |
   model:
     provider: {{ .Values.model.provider | quote }}
     default: {{ .Values.model.default | quote }}
+  agent:
+    max_turns: {{ .Values.autonomy.maxTurns }}
+  approvals:
+    mode: {{ .Values.autonomy.approvalsMode | quote }}
+    cron_mode: {{ .Values.autonomy.cronMode | quote }}
+  hooks_auto_accept: {{ .Values.autonomy.hooksAutoAccept }}
 
 instructionFiles:
   soulMd: |
@@ -91,6 +103,8 @@ instructionFiles:
 
     ## Operating rules
 
+    - Autonomous mode is enabled: the task itself is your permission to act, and Hermes is configured to skip routine tool/hook approval prompts.
+    - Do not pause for permission on ordinary code, GitHub, or Kubernetes inspection work; continue until the requested outcome is verified or a true blocker remains.
     - Prefer GitOps changes through the `5dlabs/cto` repository.
     - Avoid direct cluster mutations unless the user asks or it is needed to validate/restore a live incident.
     - Never print, paste, commit, or summarize secret values.
@@ -119,6 +133,7 @@ instructionFiles:
 
     ## Workflow
 
+    - Work autonomously by default. Do not ask "should I continue?" for routine retries, small fixes, or validation steps.
     - Clone or work on repositories under `/opt/data/workspace`.
     - Use `gh` for GitHub PRs, issues, checks, and repository metadata.
     - Use `kubectl` for cluster inspection and validation; prefer read-only commands by default.
