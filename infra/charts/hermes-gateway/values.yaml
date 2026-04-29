@@ -25,15 +25,20 @@ persistence:
 workspace:
   mountPath: /opt/data/workspace
 
-github:
-  cli:
-    image: docker.io/debian:trixie-slim
+runtimeTools:
+  image: docker.io/debian:trixie-slim
+
+kubectl:
+  version: v1.35.0
 
 # Upstream container runs as UID 10000 (user `hermes`) via gosu.
 podSecurityContext:
   fsGroup: 10000
 
 securityContext: {}
+
+rbac:
+  create: true
 
 resources:
   requests:

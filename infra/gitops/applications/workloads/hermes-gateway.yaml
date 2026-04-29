@@ -13,6 +13,9 @@
 #   - cto-secrets                (key `COPILOT_GITHUB_TOKEN` -> COPILOT_GITHUB_TOKEN)
 #   - cto-coder-api-keys         (key `github-pat` -> GH_TOKEN/GITHUB_TOKEN)
 #
+# The chart grants this service account cluster-admin parity with the older
+# OpenClaw Coder runtime so Hermes can use kubectl for agent/debug tasks.
+#
 # Confirm Message Content + Server Members intents are ON in the Discord
 # Developer Portal for the Coder bot.
 # =============================================================================

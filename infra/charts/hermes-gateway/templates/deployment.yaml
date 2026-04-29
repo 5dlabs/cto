@@ -35,7 +35,7 @@ spec:
             - -c
             - |
               set -eu
-              mkdir -p {{ .Values.persistence.mountPath | quote }} {{ .Values.workspace.mountPath | quote }} {{ .Values.persistence.mountPath }}/home/bin
+              mkdir -p {{ .Values.persistence.mountPath | quote }} {{ .Values.workspace.mountPath | quote }} {{ .Values.persistence.mountPath }}/home/bin {{ .Values.persistence.mountPath }}/home/.kube
               cp /config-template/config.yaml {{ .Values.persistence.mountPath }}/config.yaml
               cat > {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token <<'EOF'
               #!/bin/sh
@@ -64,19 +64,42 @@ spec:
                 helper = {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token
               EOF
               sed -i 's/^              //' {{ .Values.persistence.mountPath }}/home/.gitconfig
+              cat > {{ .Values.persistence.mountPath }}/home/.kube/config <<'EOF'
+              apiVersion: v1
+              kind: Config
+              clusters:
+              - name: in-cluster
+                cluster:
+                  server: https://kubernetes.default.svc
+                  certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              users:
+              - name: pod-service-account
+                user:
+                  tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              contexts:
+              - name: in-cluster
+                context:
+                  cluster: in-cluster
+                  user: pod-service-account
+                  namespace: {{ .Release.Namespace }}
+              current-context: in-cluster
+              EOF
+              sed -i 's/^              //' {{ .Values.persistence.mountPath }}/home/.kube/config
               chown -R 10000:10000 {{ .Values.workspace.mountPath | quote }} {{ .Values.persistence.mountPath }}/home
               chown 10000:10000 {{ .Values.persistence.mountPath }}/config.yaml
               chmod 600 {{ .Values.persistence.mountPath }}/config.yaml
               chmod 700 {{ .Values.persistence.mountPath }}/home/bin
               chmod 700 {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token
               chmod 600 {{ .Values.persistence.mountPath }}/home/.gitconfig
+              chmod 700 {{ .Values.persistence.mountPath }}/home/.kube
+              chmod 600 {{ .Values.persistence.mountPath }}/home/.kube/config
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath | quote }}
             - name: config-template
               mountPath: /config-template
-        - name: install-github-cli
-          image: {{ .Values.github.cli.image | quote }}
+        - name: install-runtime-tools
+          image: {{ .Values.runtimeTools.image | quote }}
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0
@@ -87,11 +110,19 @@ spec:
             - |
               set -eu
               apt-get update -qq
-              apt-get install -y --no-install-recommends gh >/dev/null
+              apt-get install -y --no-install-recommends ca-certificates curl gh >/dev/null
               mkdir -p {{ .Values.persistence.mountPath }}/home/bin
               cp "$(command -v gh)" {{ .Values.persistence.mountPath }}/home/bin/gh
+              KUBECTL_ARCH="amd64"
+              case "$(uname -m)" in
+                aarch64|arm64)
+                  KUBECTL_ARCH="arm64"
+                  ;;
+              esac
+              curl -fsSL -o {{ .Values.persistence.mountPath }}/home/bin/kubectl "https://dl.k8s.io/release/{{ .Values.kubectl.version }}/bin/linux/${KUBECTL_ARCH}/kubectl"
+              chmod 755 {{ .Values.persistence.mountPath }}/home/bin/kubectl
               chmod 755 {{ .Values.persistence.mountPath }}/home/bin/gh
-              chown 10000:10000 {{ .Values.persistence.mountPath }}/home/bin/gh
+              chown 10000:10000 {{ .Values.persistence.mountPath }}/home/bin/gh {{ .Values.persistence.mountPath }}/home/bin/kubectl
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath | quote }}
@@ -111,6 +142,8 @@ spec:
           env:
             - name: HOME
               value: "{{ .Values.persistence.mountPath }}/home"
+            - name: KUBECONFIG
+              value: "{{ .Values.persistence.mountPath }}/home/.kube/config"
             - name: PATH
               value: "{{ .Values.persistence.mountPath }}/home/bin:{{ .Values.persistence.mountPath }}/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
             - name: HERMES_HOME
@@ -170,6 +203,10 @@ spec:
             - name: data
               mountPath: /usr/local/bin/gh
               subPath: home/bin/gh
+              readOnly: true
+            - name: data
+              mountPath: /usr/local/bin/kubectl
+              subPath: home/bin/kubectl
               readOnly: true
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
