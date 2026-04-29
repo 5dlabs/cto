@@ -275,22 +275,38 @@ kubectl -n cto delete pod openclaw-hermes-coder-0   # safe — sts will recreate
 kubectl -n cto wait --for=condition=Ready pod/openclaw-hermes-coder-0 --timeout=120s
 ```
 
-### 10.2 Verify the obsolete `openclaw invoke` syntax
+### 10.2 OpenClaw 2026.4.x plugin-compat blocker (confirmed locally)
 
-`intake/workflows/pipeline.lobster.yaml` lines **1073** and **1187** still use
-the legacy `openclaw invoke --tool llm-task` form. Before launching sigma-1,
-confirm the current OpenClaw binary on Hermes either still accepts that form
-or has been migrated. **Do not guess** — pull the binary's `--help` and the
-LLM tool docs from inside the pod:
+`intake/workflows/pipeline.lobster.yaml` lines **1073** and **1187** call
+`openclaw invoke --tool llm-task --action json`. Local testing against the
+**2026.4.x** OpenClaw build confirmed this form is **broken**:
+
+- Neither the `invoke` plugin nor the `llm` plugin exists in the 2026.4.x
+  build. The gateway emits `plugin not found: stale config entry ignored`
+  on startup for both.
+- Any `openclaw invoke …` call fails before reaching the LLM step.
+- Gateway log path inside the pod: `/workspace/.openclaw/logs/openclaw.log`
+- Internal token (for direct gateway probes): `OPENCLAW_TOKEN=openclaw-internal`
+- If the gateway is wedged, restart it with the `setsid` pattern (kubectl exec
+  alone leaves the new process attached and it dies with the exec session):
+  ```bash
+  kubectl -n cto exec openclaw-hermes-coder-0 -- sh -lc \
+    'setsid nohup openclaw gateway >/workspace/.openclaw/logs/openclaw.log 2>&1 < /dev/null &'
+  ```
+
+**Hermes must verify the binary on the pod first** (it may be a newer build
+than what was tested locally) and, if the plugins are still missing, **patch
+the pipeline before launching sigma-1** rather than during the run:
 
 ```bash
 kubectl -n cto exec openclaw-hermes-coder-0 -- openclaw --version
-kubectl -n cto exec openclaw-hermes-coder-0 -- openclaw invoke --help
-kubectl -n cto exec openclaw-hermes-coder-0 -- openclaw llm --help 2>/dev/null || true
+kubectl -n cto exec openclaw-hermes-coder-0 -- openclaw invoke --help 2>&1 | head -20
+kubectl -n cto exec openclaw-hermes-coder-0 -- openclaw llm --help 2>&1 | head -20
 ```
 
-If the syntax has changed, patch the pipeline before the run rather than
-during it.
+The replacement syntax (Bun `apps/intake-agent` op, direct LLM call, etc.)
+is whatever the current OpenClaw + intake-agent docs prescribe — **read those
+docs, do not guess**.
 
 ### 10.3 Discord bridge bot identity (status)
 
