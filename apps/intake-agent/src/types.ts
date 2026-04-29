@@ -18,7 +18,8 @@ export type Operation =
   | 'ping'
   | 'prd_research'
   | 'design_intake'
-  | 'design_variants';
+  | 'design_variants'
+  | 'generate_deliberation_video';
 
 /**
  * Base request structure for all operations.
@@ -124,7 +125,7 @@ export function validateRequest(request: unknown): request is AgentRequest {
   const req = request as Record<string, unknown>;
   return (
     typeof req['operation'] === 'string' &&
-    ['ping', 'prd_research', 'design_intake', 'design_variants'].includes(req['operation'] as string)
+    ['ping', 'prd_research', 'design_intake', 'design_variants', 'generate_deliberation_video'].includes(req['operation'] as string)
   );
 }
 
