@@ -31,9 +31,11 @@ Every committee character portrait **must** satisfy all of the following:
    subtle logo, not abstract — readable "5D" lettering.
 4. **Black tactical gloves** on both hands, visible at chest level.
 5. **Portrait orientation, head-and-shoulders crop**, subject centered.
-6. **Clean studio background** — soft neutral gradient, gentle rim light. No
-   neon city scenes for committee portraits (those are reserved for the
-   in-world Morgan / cyberpunk variants).
+6. **Cyberpunk Neo-Kyoto background** — same world as Morgan's anchor portrait:
+   neon Japanese signage (cyan / magenta / hot pink), rain-slick streets,
+   distant flying vehicles, holographic UI accents. The 5D patch glows; gloves
+   show circuit-pattern detailing. The committee shares Morgan's environment,
+   not a clean studio.
 7. **Photorealistic illustration** with intricate fur detail.
 8. **Generation model:** `model_google-gemini-3-1-flash` (the model used for
    Morgan's canonical portrait `asset_Pu5sikArqYfER2M4YR6NRUyk`). Using the
