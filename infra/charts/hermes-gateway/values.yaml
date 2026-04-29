@@ -44,17 +44,15 @@ secrets:
   # Discord bot token, key `coder` -> DISCORD_BOT_TOKEN.
   discordSecretName: openclaw-discord-tokens
   discordSecretKey: coder
-  # GitHub Copilot OAuth/fine-grained token -> COPILOT_GITHUB_TOKEN.
-  copilotSecretName: cto-coder-api-keys
-  copilotSecretKey: copilot-github-token
+  # GitHub Copilot OAuth token -> COPILOT_GITHUB_TOKEN.
+  copilotSecretName: cto-secrets
+  copilotSecretKey: COPILOT_GITHUB_TOKEN
 
 # Primary inference provider. Hermes' direct `copilot` provider reads
 # COPILOT_GITHUB_TOKEN before GH_TOKEN/GITHUB_TOKEN.
-# The current Coder Copilot token catalog exposes `gpt-4o`; newer GPT-5.x
-# aliases are rejected by the live GitHub Copilot API for this token.
 model:
   provider: copilot
-  default: gpt-4o
+  default: gpt-5.5
 
 configYaml: |
   model:
