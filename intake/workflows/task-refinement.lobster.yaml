@@ -151,7 +151,7 @@ steps:
             },
             "schema": $schema, "provider": $provider, "model": $model}');
       fi;
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS" > "$OUT_FILE";
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS" > "$OUT_FILE";
       printf '%s' "$OUT_FILE"
 
   - id: vote-round-1
@@ -248,7 +248,7 @@ steps:
             },
             "schema": $schema, "provider": $provider, "model": $model}');
       fi;
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS" > "$OUT_FILE";
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS" > "$OUT_FILE";
       printf '%s' "$OUT_FILE"
 
   - id: vote-round-2

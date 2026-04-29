@@ -68,7 +68,7 @@ ARGS="$(jq -n \
   --arg model "$MODEL" \
   '{prompt:$prompt,input:($gate_input|fromjson),schema:$schema,provider:$provider,model:$model}')"
 
-OUT="$("$ROOT/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")" || {
+OUT="$("$ROOT/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS")" || {
   echo "quality-gate: LLM infrastructure unavailable for stage=$STAGE" >&2
   printf '{"skipped":true,"fallback":true,"reason":"llm_unavailable","stage":"%s"}\n' "$STAGE"
   exit 75

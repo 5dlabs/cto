@@ -229,7 +229,7 @@ steps:
           "provider": $provider,
           "model": $model
         }')
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$OPT_ARGS"
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action text --args-json "$OPT_ARGS"
 
   - id: notify-opt
     env:
@@ -352,7 +352,7 @@ steps:
           "provider": $provider,
           "model": $model
         }')
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$PES_ARGS"
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action text --args-json "$PES_ARGS"
 
   - id: notify-pes
     env:
@@ -777,7 +777,7 @@ steps:
           "model": $model,
           "temperature": 0.2
         }')
-      if BRIEF_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$BRIEF_ARGS")"; then
+      if BRIEF_OUT="$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action text --args-json "$BRIEF_ARGS")"; then
         printf '%s\n' "$BRIEF_OUT"
       else
         echo "compile-brief: LLM summarization failed; generating deterministic fallback brief" >&2

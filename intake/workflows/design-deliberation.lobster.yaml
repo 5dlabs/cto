@@ -129,7 +129,7 @@ steps:
         }')
       TRACE="${WORKSPACE:-.}/.intake/design-elicitation-trace.log"
       echo "designer-turn: starting LLM call provider=${model_frontier_provider} model=${model_frontier}" >> "$TRACE"
-      LLM_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-json "$DESIGNER_ARGS" 2>>"$TRACE")" || {
+      LLM_OUT="$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action text --args-json "$DESIGNER_ARGS" 2>>"$TRACE")" || {
         echo "designer-turn: LLM FAILED exit=$?" >> "$TRACE"
         exit 1
       }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Batched task expansion — splits N tasks into batches of BATCH_SIZE,
-# calls openclaw-invoke-retry for each batch, then merges results.
+# calls the harness-agnostic llm-invoke adapter for each batch, then merges results.
 # This avoids LLM output token limits on large task sets.
 #
 # Usage: expand-tasks-batched.sh --tasks-file <path> --complexity-file <path> \
@@ -83,7 +83,7 @@ while [ "$OFFSET" -lt "$TOTAL_TASKS" ]; do
       "schema": $schema, "provider": $provider, "model": $model}')
 
   BATCH_OUT="$TMPDIR_BATCH/batch-${BATCH_IDX}-out.json"
-  if "$ROOT/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS" > "$BATCH_OUT" 2>"$TMPDIR_BATCH/batch-${BATCH_IDX}-stderr.txt"; then
+  if "$ROOT/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS" > "$BATCH_OUT" 2>"$TMPDIR_BATCH/batch-${BATCH_IDX}-stderr.txt"; then
     if ! validate_expansion_output "$BATCH_OUT" "$EXPECTED_IDS_JSON" "$COUNT"; then
       echo "expand-tasks-batched: batch $BATCH_IDX returned invalid/partial expansion payload — falling back to individual" >&2
       rm -f "$BATCH_OUT"
@@ -113,7 +113,7 @@ while [ "$OFFSET" -lt "$TOTAL_TASKS" ]; do
           "input": {"tasks": ($tasks_raw | fromjson), "complexity": ($complexity_raw | fromjson)},
           "schema": $schema, "provider": $provider, "model": $model}')
       SINGLE_OUT="$TMPDIR_BATCH/single-${BATCH_IDX}-${i}-out.json"
-      if ! "$ROOT/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$SINGLE_ARGS" > "$SINGLE_OUT" 2>/dev/null; then
+      if ! "$ROOT/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$SINGLE_ARGS" > "$SINGLE_OUT" 2>/dev/null; then
         echo "expand-tasks-batched: task $((i+1)) individual expand FAILED" >&2
         exit 1
       fi

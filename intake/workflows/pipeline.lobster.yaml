@@ -1081,8 +1081,8 @@ steps:
         echo "initial-parse-prd: failed to build LLM args — falling back to empty tasks" >&2
         printf '[]'; exit 0
       }
-      OUTPUT=$("$WS/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
-        echo "initial-parse-prd: openclaw.invoke failed — falling back to empty tasks" >&2
+      OUTPUT=$("$WS/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS") || {
+        echo "initial-parse-prd: LLM invoke failed — falling back to empty tasks" >&2
         printf '[]'; exit 0
       }
       if [ -z "$OUTPUT" ] || ! printf '%s' "$OUTPUT" | jq -e 'type' >/dev/null 2>&1; then
@@ -1195,8 +1195,8 @@ steps:
         printf '[]' > "$WS/.intake/decision-points.json"
         printf '[]'; exit 0
       }
-      OUTPUT=$("$WS/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
-        echo "extract-decision-points: openclaw.invoke failed" >&2
+      OUTPUT=$("$WS/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS") || {
+        echo "extract-decision-points: LLM invoke failed" >&2
         printf '[]' > "$WS/.intake/decision-points.json"
         printf '[]'; exit 0
       }
@@ -1654,7 +1654,7 @@ steps:
       HEALTH_OK=false
       if curl -sf --max-time 5 http://127.0.0.1:18789/health >/dev/null 2>&1; then
         HEALTH_OK=true
-        echo "gateway-health-check: OpenClaw gateway healthy (HTTP)" >&2
+        echo "gateway-health-check: LLM gateway healthy (HTTP)" >&2
       fi
       if [ "$HEALTH_OK" = "false" ]; then
         echo "gateway-health-check: gateway HTTP health failed — attempting restart..." >&2
@@ -2229,7 +2229,7 @@ steps:
           "📋 Expanded tasks: 0\n" +
           "⏱️ Total time: " + $dur + "\n" +
           "⏰ Failed at " + $ts + "\n\n" +
-          "🔍 Check the lobster run terminal output and OpenClaw gateway logs for errors.\n" +
+          "🔍 Check the lobster run terminal output and LLM harness logs for errors.\n" +
           "🦞 *The intake workflow ran but did not generate any tasks, docs, or prompts.*"')
         META=$(jq -nc \
           --arg step "pipeline-failed" \
