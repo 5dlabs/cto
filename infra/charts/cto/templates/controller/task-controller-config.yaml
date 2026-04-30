@@ -132,4 +132,11 @@ data:
     linear:
       sidecarImage: {{ .Values.controller.linear.sidecarImage | default "registry.5dlabs.ai/5dlabs/linear-sidecar:latest" | quote }}
       serviceUrl: {{ .Values.controller.linear.serviceUrl | default "http://pm-server:8080" | quote }}
+
+    presence:
+      enabled: {{ .Values.controller.presence.enabled | default false }}
+      hermesAdapterImage: {{ .Values.controller.presence.hermesAdapterImage | default "ghcr.io/5dlabs/hermes-presence-adapter:latest" | quote }}
+      routerUrl: {{ .Values.controller.presence.routerUrl | default "http://discord-bridge-http.bots.svc:3200" | quote }}
+      sharedTokenSecretName: {{ .Values.controller.presence.sharedTokenSecretName | default "openclaw-discord-tokens" | quote }}
+      sharedTokenSecretKey: {{ .Values.controller.presence.sharedTokenSecretKey | default "PRESENCE_SHARED_TOKEN" | quote }}
 {{- end }}

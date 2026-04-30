@@ -76,6 +76,18 @@ spec:
             - name: INACTIVITY_TIMEOUT_MS
               value: "3600000"
 
+            # Shared bearer token for runtime presence routes.
+            - name: PRESENCE_SHARED_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: openclaw-discord
+                  key: PRESENCE_SHARED_TOKEN
+                  optional: false
+            - name: WORKSPACE
+              value: /data/discord-bridge
+            - name: PRESENCE_ROUTE_STORE_PATH
+              value: /data/discord-bridge/.intake/presence-routes.json
+
           ports:
             - name: http
               containerPort: 3200
@@ -88,6 +100,10 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+
+          volumeMounts:
+            - name: bridge-state
+              mountPath: /data/discord-bridge
 
           # Liveness probe
           livenessProbe:
@@ -114,6 +130,22 @@ spec:
             failureThreshold: 3
 
       restartPolicy: Always
+      volumes:
+        - name: bridge-state
+          persistentVolumeClaim:
+            claimName: discord-bridge-state
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: discord-bridge-state
+  namespace: bots
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
 ---
 # ExternalSecret to pull Discord token from OpenBao
 apiVersion: external-secrets.io/v1beta1
@@ -133,8 +165,13 @@ spec:
       engineVersion: v2
       data:
         DISCORD_TOKEN_BRIDGE: "{{ .token }}"
+        PRESENCE_SHARED_TOKEN: "{{ .presenceSharedToken }}"
   data:
     - secretKey: token
       remoteRef:
         key: openclaw-discord
         property: DISCORD_TOKEN_BRIDGE
+    - secretKey: presenceSharedToken
+      remoteRef:
+        key: openclaw-discord
+        property: PRESENCE_SHARED_TOKEN

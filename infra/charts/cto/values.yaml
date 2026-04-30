@@ -272,6 +272,14 @@ controller:
     sidecarImage: registry.5dlabs.ai/5dlabs/linear-sidecar:dev
     serviceUrl: http://pm-server:8080
 
+  # Runtime-neutral Discord/Presence routing for worker CRDs
+  presence:
+    enabled: false
+    hermesAdapterImage: ghcr.io/5dlabs/hermes-presence-adapter:dev
+    routerUrl: http://discord-bridge-http.bots.svc:3200
+    sharedTokenSecretName: openclaw-discord-tokens
+    sharedTokenSecretKey: PRESENCE_SHARED_TOKEN
+
 # =============================================================================
 # Agent Configuration - CodeRun/Workflow Defaults
 # =============================================================================

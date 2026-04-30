@@ -57,7 +57,7 @@ jobs:
         uses: ./.github/actions/docker-build-push
         with:
           image-name: discord-bridge
-          context: apps/discord-bridge
+          context: .
           dockerfile: apps/discord-bridge/Dockerfile
           version: ${{ steps.version.outputs.version }}
           short-sha: ${{ github.sha }}

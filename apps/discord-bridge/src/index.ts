@@ -4,6 +4,9 @@ import { RoomManager } from "./room-manager.js";
 import { createBridge } from "./bridge.js";
 import { createDiscordElicitationHandler } from "./elicitation-handler.js";
 import { createHttpServer } from "./http-server.js";
+import { normalizeDiscordMessage } from "./discord-normalizer.js";
+import { createPresenceFabric } from "./presence-fabric.js";
+import { createPresenceRouter } from "./presence-router.js";
 
 const logger = {
   info: (...args: unknown[]) => console.log(`[bridge]`, ...args),
@@ -18,6 +21,12 @@ async function main(): Promise<void> {
   logger.info(`  HTTP port: ${config.httpPort}`);
   logger.info(`  Linear bridge: ${config.linearBridgeUrl}`);
   logger.info(`  Inactivity timeout: ${config.inactivityTimeoutMs}ms`);
+  if (config.presenceRouteStorePath) {
+    logger.info(`  Presence route store: ${config.presenceRouteStorePath}`);
+  }
+  if (config.natsUrl) {
+    logger.info(`  Presence NATS URL: ${config.natsUrl}`);
+  }
 
   // 1. Connect to Discord and initialize rooms
   const discord = await createDiscordClient(config.discordToken, logger);
@@ -41,7 +50,36 @@ async function main(): Promise<void> {
     });
   });
 
-  // 6. Start HTTP notification server
+  // 6. Create the runtime-neutral presence router foundation
+  const presenceFabric = await createPresenceFabric(config.natsUrl, logger);
+  const presence = createPresenceRouter(
+    discord,
+    logger,
+    config.presenceRouteStorePath,
+    presenceFabric,
+    config.presenceSharedToken,
+  );
+
+  discord.onMessage((message) => {
+    void (async () => {
+      const event = normalizeDiscordMessage(message, {
+        accountId: config.presenceAccountId,
+        defaultAgentId: config.presenceDefaultAgentId,
+        botUserId: message.client.user?.id,
+      });
+      if (!event) {
+        return;
+      }
+      const result = await presence.routeDiscordEvent(event);
+      if (result.deliveries.length > 0) {
+        logger.info(`Presence routed Discord message ${event.discord.message_id ?? "unknown"} to ${result.deliveries.length} worker(s)`);
+      }
+    })().catch((err) => {
+      logger.warn(`Presence Discord ingress failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  });
+
+  // 7. Start HTTP notification server
   const httpServer = createHttpServer(
     config.httpPort,
     bridge,
@@ -49,6 +87,8 @@ async function main(): Promise<void> {
     logger,
     config.deliberationChannelId,
     discord,
+    presence,
+    config.presenceSharedToken,
   );
   await httpServer.start();
 
@@ -60,6 +100,7 @@ async function main(): Promise<void> {
     bridge.stop();
     elicitHandler.destroy();
     await httpServer.stop();
+    await presenceFabric.close();
     discord.destroy();
     process.exit(0);
   };

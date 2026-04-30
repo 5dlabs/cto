@@ -1,0 +1,356 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cto-hermes-coder-control
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: hermes-gateway
+    app.kubernetes.io/instance: cto-hermes-coder-control
+    app.kubernetes.io/component: control-plane-builder
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/managed-by: gitops
+    app.kubernetes.io/version: v2026.4.23
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hermes-gateway
+      app.kubernetes.io/instance: cto-hermes-coder-control
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hermes-gateway
+        app.kubernetes.io/instance: cto-hermes-coder-control
+        app.kubernetes.io/component: control-plane-builder
+        tags.datadoghq.com/service: cto-hermes-coder-control
+      annotations:
+        purpose: hermes-control-plane-builder
+        ad.datadoghq.com/hermes.logs: '[{"source":"hermes","service":"cto-hermes-coder-control"}]'
+    spec:
+      serviceAccountName: cto-hermes-coder-control
+      securityContext:
+        fsGroup: 10000
+      initContainers:
+        - name: write-hermes-config
+          image: docker.io/nousresearch/hermes-agent:v2026.4.23
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p "/opt/data" "/opt/data/workspace" /opt/data/home/bin /opt/data/home/.kube /opt/data/home/.codex /opt/data/workspace/.codex /opt/data/workspace/.claude /opt/data/npm-global /opt/data/bin
+              if command -v npm >/dev/null 2>&1; then
+                npm config set prefix /opt/data/npm-global >/dev/null
+                if [ ! -x /opt/data/npm-global/bin/claude ]; then
+                  npm install -g @anthropic-ai/claude-code@2.1.119 --no-audit --no-fund
+                fi
+                if [ ! -x /opt/data/npm-global/bin/claude-agent-acp ]; then
+                  npm install -g @agentclientprotocol/claude-agent-acp@0.30.0 --no-audit --no-fund
+                fi
+                if [ ! -x /opt/data/npm-global/bin/codex ]; then
+                  npm install -g @openai/codex@0.125.0 --no-audit --no-fund
+                fi
+                ln -sf /opt/data/npm-global/bin/claude /opt/data/bin/claude
+                ln -sf /opt/data/npm-global/bin/claude-agent-acp /opt/data/bin/claude-agent-acp
+                ln -sf /opt/data/npm-global/bin/codex /opt/data/bin/codex
+              fi
+              if [ -n "${CODEX_AUTH_SUB1:-}" ]; then
+                printf '%s' "$CODEX_AUTH_SUB1" > /opt/data/home/.codex/auth.json
+                printf '%s' "$CODEX_AUTH_SUB1" > /opt/data/workspace/.codex/auth.json
+                chmod 600 /opt/data/home/.codex/auth.json /opt/data/workspace/.codex/auth.json
+              fi
+              if [ -n "${CODEX_AUTH_SUB2:-}" ]; then
+                printf '%s' "$CODEX_AUTH_SUB2" > /opt/data/home/.codex/auth-sub2.json
+                printf '%s' "$CODEX_AUTH_SUB2" > /opt/data/workspace/.codex/auth-sub2.json
+                chmod 600 /opt/data/home/.codex/auth-sub2.json /opt/data/workspace/.codex/auth-sub2.json
+              fi
+              cp /config-template/config.yaml /opt/data/config.yaml
+              cp /config-template/SOUL.md /opt/data/SOUL.md
+              cp /config-template/AGENTS.md /opt/data/workspace/AGENTS.md
+              cp /config-template/TOOLS.md /opt/data/workspace/TOOLS.md
+              if [ -r /patches/patch-discord-sethome.py ]; then
+                python3 /patches/patch-discord-sethome.py
+                python3 -m py_compile /opt/hermes/gateway/platforms/discord.py
+              fi
+              cat > /opt/data/home/bin/git-credential-github-token <<'EOF'
+              #!/bin/sh
+              [ "${1:-get}" = "get" ] || exit 0
+              host=""
+              while IFS= read -r line; do
+                [ -n "$line" ] || break
+                case "$line" in
+                  host=*) host=${line#host=} ;;
+                esac
+              done
+              case "$host" in
+                github.com|api.github.com)
+                  token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+                  if [ -z "$token" ] && [ -r "/var/run/secrets/hermes-github/token" ]; then
+                    token="$(cat "/var/run/secrets/hermes-github/token")"
+                  fi
+                  [ -n "$token" ] || exit 0
+                  printf 'username=x-access-token\n'
+                  printf 'password=%s\n' "$token"
+                  ;;
+              esac
+              EOF
+              sed -i 's/^              //' /opt/data/home/bin/git-credential-github-token
+              cat > /opt/data/home/.gitconfig <<EOF
+              [credential "https://github.com"]
+                helper = /opt/data/home/bin/git-credential-github-token
+              [credential "https://api.github.com"]
+                helper = /opt/data/home/bin/git-credential-github-token
+              EOF
+              sed -i 's/^              //' /opt/data/home/.gitconfig
+              cat > /opt/data/home/.kube/config <<'EOF'
+              apiVersion: v1
+              kind: Config
+              clusters:
+              - name: in-cluster
+                cluster:
+                  server: https://kubernetes.default.svc
+                  certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              users:
+              - name: pod-service-account
+                user:
+                  tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              contexts:
+              - name: in-cluster
+                context:
+                  cluster: in-cluster
+                  user: pod-service-account
+                  namespace: cto
+              current-context: in-cluster
+              EOF
+              sed -i 's/^              //' /opt/data/home/.kube/config
+              chown -R 10000:10000 "/opt/data/workspace" /opt/data/home
+              chown 10000:10000 /opt/data/config.yaml
+              chown 10000:10000 /opt/data/SOUL.md /opt/data/workspace/AGENTS.md /opt/data/workspace/TOOLS.md
+              chmod 600 /opt/data/config.yaml
+              chmod 644 /opt/data/SOUL.md /opt/data/workspace/AGENTS.md /opt/data/workspace/TOOLS.md
+              chmod 700 /opt/data/home/bin
+              chmod 700 /opt/data/home/bin/git-credential-github-token
+              chmod 600 /opt/data/home/.gitconfig
+              chmod 700 /opt/data/home/.kube
+              chmod 600 /opt/data/home/.kube/config
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: config-template
+              mountPath: /config-template
+            - name: patches
+              mountPath: /patches
+          env:
+            - name: CODEX_AUTH_SUB1
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: codex-auth-sub1
+                  optional: false
+            - name: CODEX_AUTH_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: codex-auth-sub2
+                  optional: false
+        - name: install-runtime-tools
+          image: docker.io/debian:trixie-slim
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              apt-get update -qq
+              apt-get install -y --no-install-recommends ca-certificates curl gh >/dev/null
+              mkdir -p /opt/data/home/bin
+              cp "$(command -v gh)" /opt/data/home/bin/gh-real
+              cat > /opt/data/home/bin/gh <<'EOF'
+              #!/bin/sh
+              if [ -z "${GH_TOKEN:-}" ] && [ -r "/var/run/secrets/hermes-github/token" ]; then
+                export GH_TOKEN="$(cat "/var/run/secrets/hermes-github/token")"
+              fi
+              exec /opt/data/home/bin/gh-real "$@"
+              EOF
+              sed -i 's/^              //' /opt/data/home/bin/gh
+              KUBECTL_ARCH="amd64"
+              case "$(uname -m)" in
+                aarch64|arm64)
+                  KUBECTL_ARCH="arm64"
+                  ;;
+              esac
+              curl -fsSL -o /opt/data/home/bin/kubectl "https://dl.k8s.io/release/v1.35.0/bin/linux/${KUBECTL_ARCH}/kubectl"
+              chmod 755 /opt/data/home/bin/kubectl
+              chmod 755 /opt/data/home/bin/gh /opt/data/home/bin/gh-real
+              chown 10000:10000 /opt/data/home/bin/gh /opt/data/home/bin/gh-real /opt/data/home/bin/kubectl
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+      containers:
+        - name: hermes
+          image: docker.io/nousresearch/hermes-agent:v2026.4.23
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+          args:
+            - |
+              set -eu
+              if [ -r /patches/patch-discord-sethome.py ]; then
+                python3 /patches/patch-discord-sethome.py
+                python3 -m py_compile /opt/hermes/gateway/platforms/discord.py
+              fi
+              exec /opt/hermes/docker/entrypoint.sh hermes --yolo --accept-hooks gateway run --accept-hooks
+          workingDir: /opt/data/workspace
+          env:
+            - name: HOME
+              value: /opt/data/home
+            - name: KUBECONFIG
+              value: /opt/data/home/.kube/config
+            - name: PATH
+              value: /opt/data/home/bin:/opt/data/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
+            - name: HERMES_HOME
+              value: /opt/data
+            - name: WORKSPACE
+              value: /opt/data/workspace
+            - name: GH_TOKEN_FILE
+              value: /var/run/secrets/hermes-github/token
+            - name: HERMES_INFERENCE_PROVIDER
+              value: copilot
+            - name: HERMES_MODEL
+              value: gpt-5.5
+            - name: HERMES_YOLO_MODE
+              value: "1"
+            - name: HERMES_AGENT_PURPOSE
+              value: control-plane-builder
+            - name: CLAUDE_CONFIG_DIR
+              value: /opt/data/workspace/.claude
+            - name: CLAUDE_CODE_OAUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: anthropic-sub1-oauth
+                  optional: false
+            - name: CLAUDE_CODE_OAUTH_TOKEN_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: anthropic-sub2-oauth
+                  optional: false
+            - name: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+              value: "1"
+            - name: CODEX_AUTH_SUB1
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: codex-auth-sub1
+                  optional: false
+            - name: CODEX_AUTH_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: codex-auth-sub2
+                  optional: false
+            - name: DISABLE_AUTOUPDATER
+              value: "1"
+            - name: DISABLE_TELEMETRY
+              value: "1"
+            - name: DD_SERVICE
+              value: cto-hermes-coder-control
+            - name: DISCORD_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-coder-control-plane-discord
+                  key: DISCORD_BOT_TOKEN
+                  optional: false
+            - name: COPILOT_GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cto-secrets
+                  key: COPILOT_GITHUB_TOKEN
+                  optional: false
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: github-pat
+                  optional: false
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: github-pat
+                  optional: false
+            - name: DISCORD_ALLOWED_USERS
+              value: "444519104808878090"
+          envFrom:
+            - secretRef:
+                name: hermes-coder-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pgrep -f 'hermes' >/dev/null
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pgrep -f 'hermes' >/dev/null
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: data
+              mountPath: /usr/local/bin/gh
+              subPath: home/bin/gh
+              readOnly: true
+            - name: data
+              mountPath: /usr/local/bin/kubectl
+              subPath: home/bin/kubectl
+              readOnly: true
+            - name: github-token
+              mountPath: /var/run/secrets/hermes-github
+              readOnly: true
+            - name: patches
+              mountPath: /patches
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: cto-hermes-coder-control-data
+        - name: config-template
+          configMap:
+            name: cto-hermes-coder-control-config
+        - name: patches
+          configMap:
+            name: cto-hermes-coder-control-patches
+            defaultMode: 0555
+        - name: github-token
+          secret:
+            secretName: cto-coder-api-keys
+            defaultMode: 0440
+            items:
+              - key: github-pat
+                path: token

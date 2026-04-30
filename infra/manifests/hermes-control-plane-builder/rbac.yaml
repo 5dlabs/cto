@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cto-hermes-coder-control
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: hermes-gateway
+    app.kubernetes.io/instance: cto-hermes-coder-control
+    app.kubernetes.io/component: control-plane-builder
+    app.kubernetes.io/part-of: cto-platform
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cto-hermes-coder-control
+  labels:
+    app.kubernetes.io/name: hermes-gateway
+    app.kubernetes.io/instance: cto-hermes-coder-control
+    app.kubernetes.io/component: control-plane-builder
+    app.kubernetes.io/part-of: cto-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cto-hermes-gateway
+subjects:
+  - kind: ServiceAccount
+    name: cto-hermes-coder-control
+    namespace: cto
