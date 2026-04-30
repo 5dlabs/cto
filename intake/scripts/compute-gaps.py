@@ -231,7 +231,10 @@ def main():
     skills_inv = load_json(args.inventory_skills)
     registry = load_registry(args.registry)
 
-    capabilities = caps_data.get("required_capabilities", [])
+    if isinstance(caps_data, list):
+        capabilities = caps_data
+    else:
+        capabilities = caps_data.get("required_capabilities", [])
 
     result = compute_gaps(capabilities, tools_inv, skills_inv, registry)
 
