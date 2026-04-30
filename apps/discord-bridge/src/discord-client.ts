@@ -57,6 +57,8 @@ export interface DiscordHandle {
   sendTyping(channelId: string): Promise<void>;
   /** Register a handler for interaction events (buttons, select menus) */
   onInteraction(handler: (interaction: Interaction) => void): void;
+  /** Register a handler for inbound Discord messages. */
+  onMessage(handler: (message: Message) => void): void;
   /** Disconnect from Discord */
   destroy(): void;
 }
@@ -66,7 +68,7 @@ export async function createDiscordClient(
   logger: { info: Function; warn: Function; error: Function },
 ): Promise<DiscordHandle> {
   const client = new Client({
-    intents: [GatewayIntentBits.Guilds],
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
   });
 
   await client.login(token);
@@ -318,6 +320,10 @@ export async function createDiscordClient(
 
     onInteraction(handler): void {
       client.on("interactionCreate", handler);
+    },
+
+    onMessage(handler): void {
+      client.on("messageCreate", handler);
     },
 
     destroy(): void {

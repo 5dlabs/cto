@@ -22,6 +22,8 @@ import type { ElicitationRequest, ElicitationCancel, DesignReviewRequest } from 
 export interface HttpServer {
   start(): Promise<void>;
   stop(): Promise<void>;
+  /** Exposed for tests that bind to an ephemeral port. */
+  server?: Server;
 }
 
 export function createHttpServer(
@@ -233,6 +235,21 @@ export function createHttpServer(
         return;
       }
 
+      case '/presence/discord-events': {
+        if (!authorizePresence(req, res)) return;
+        if (!presence) {
+          json(res, 503, { error: 'Presence router not initialized' });
+          return;
+        }
+        try {
+          const result = await presence.routeDiscordEvent(payload);
+          json(res, 202, result);
+        } catch (err) {
+          json(res, 400, { error: String(err instanceof Error ? err.message : err) });
+        }
+        return;
+      }
+
       case '/presence/outbound': {
         if (!authorizePresence(req, res)) return;
         if (!presence) {
@@ -361,7 +378,11 @@ export function createHttpServer(
     }
   }
 
-  return {
+  const handle: HttpServer = {
+    get server() {
+      return server;
+    },
+
     start() {
       return new Promise<void>((resolve, reject) => {
         server = createServer((req, res) => {
@@ -393,4 +414,6 @@ export function createHttpServer(
       });
     },
   };
+
+  return handle;
 }

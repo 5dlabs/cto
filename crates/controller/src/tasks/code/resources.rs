@@ -475,6 +475,7 @@ fn build_hermes_presence_adapter_env(
 
     for (env_name, spec_key) in [
         ("DISCORD_ACCOUNT_ID", "DISCORD_ACCOUNT_ID"),
+        ("PRESENCE_ACCOUNT_ID", "PRESENCE_ACCOUNT_ID"),
         ("DISCORD_GUILD_ID", "DISCORD_GUILD_ID"),
         ("PRESENCE_DISCORD_CHANNEL_ID", "PRESENCE_DISCORD_CHANNEL_ID"),
         ("DISCORD_CHANNEL_ID", "DISCORD_CHANNEL_ID"),

@@ -22,11 +22,10 @@ export interface PresenceDiscordContext {
   mentioned_agent_ids?: string[];
 }
 
-export interface PresenceInbound {
+export interface PresenceDiscordEvent {
   schema: "cto.presence.v1";
   event_type: PresenceEventType;
-  runtime: PresenceRuntime;
-  agent_id: string;
+  agent_id?: string;
   project_id?: string;
   task_id?: string;
   coderun_id?: string;
@@ -34,6 +33,11 @@ export interface PresenceInbound {
   text?: string;
   attachments?: PresenceAttachment[];
   metadata?: Record<string, string>;
+}
+
+export interface PresenceInbound extends PresenceDiscordEvent {
+  runtime: PresenceRuntime;
+  agent_id: string;
   session_key?: string;
 }
 
@@ -126,6 +130,46 @@ function validateDiscordContext(value: unknown): ValidationResult<PresenceDiscor
   };
 }
 
+export function validatePresenceDiscordEvent(payload: unknown): ValidationResult<PresenceDiscordEvent> {
+  if (!isRecord(payload)) {
+    return { ok: false, error: "payload must be an object" };
+  }
+  if (payload.schema !== "cto.presence.v1") {
+    return { ok: false, error: "schema must be cto.presence.v1" };
+  }
+  if (!isPresenceEventType(payload.event_type)) {
+    return { ok: false, error: "event_type must be message, interaction, thread, or lifecycle" };
+  }
+  const discord = validateDiscordContext(payload.discord);
+  if (!discord.ok) {
+    return { ok: false, error: discord.error };
+  }
+
+  const attachments = payload.attachments;
+  if (
+    attachments !== undefined &&
+    (!Array.isArray(attachments) || !attachments.every((item) => isRecord(item) && typeof item.url === "string"))
+  ) {
+    return { ok: false, error: "attachments must be an array of objects with url" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      schema: "cto.presence.v1",
+      event_type: payload.event_type,
+      agent_id: optionalStringField(payload, "agent_id"),
+      project_id: optionalStringField(payload, "project_id"),
+      task_id: optionalStringField(payload, "task_id"),
+      coderun_id: optionalStringField(payload, "coderun_id"),
+      discord: discord.value,
+      text: optionalStringField(payload, "text"),
+      attachments: attachments as PresenceAttachment[] | undefined,
+      metadata: isRecord(payload.metadata) ? (payload.metadata as Record<string, string>) : undefined,
+    },
+  };
+}
+
 export function validatePresenceInbound(payload: unknown): ValidationResult<PresenceInbound> {
   if (!isRecord(payload)) {
     return { ok: false, error: "payload must be an object" };
@@ -144,7 +188,9 @@ export function validatePresenceInbound(payload: unknown): ValidationResult<Pres
     return { ok: false, error: "agent_id is required" };
   }
   const discord = validateDiscordContext(payload.discord);
-  if (!discord.ok) return discord;
+  if (!discord.ok) {
+    return { ok: false, error: discord.error };
+  }
 
   const attachments = payload.attachments;
   if (

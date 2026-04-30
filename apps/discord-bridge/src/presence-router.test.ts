@@ -39,6 +39,7 @@ function createDiscordStub(): DiscordHandle & { calls: Array<Record<string, stri
       calls.push({ op: "typing", channelId });
     },
     onInteraction: () => undefined,
+    onMessage: () => undefined,
     destroy: () => undefined,
   };
 }
@@ -166,6 +167,176 @@ test("rejects ambiguous equal-score route matches", async () => {
   }
 
   await assert.rejects(() => router.routeInbound(inbound({ coderun_id: undefined, task_id: undefined })), /Ambiguous presence route/);
+});
+
+test("fans one normalized Discord event out to matching Hermes OpenClaw and hosted routes", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: unknown[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body);
+    },
+    async (workerUrl) => {
+      for (const route of [
+        { route_id: "hermes-rex", runtime: "hermes", agent_id: "rex", coderun_id: "coderun-1" },
+        { route_id: "openclaw-rex", runtime: "openclaw", agent_id: "rex", project_id: "project-1" },
+        { route_id: "hosted-rex", runtime: "hosted", agent_id: "rex", task_id: "task-1" },
+      ] as const) {
+        await router.registerRoute({
+          ...route,
+          worker_url: workerUrl,
+          discord: { account_id: "discord-bot", guild_id: "guild-1", channel_id: "channel-1", thread_id: "thread-1" },
+        });
+      }
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        agent_id: "rex",
+        project_id: "project-1",
+        task_id: "task-1",
+        coderun_id: "coderun-1",
+        discord: {
+          account_id: "discord-bot",
+          guild_id: "guild-1",
+          channel_id: "channel-1",
+          thread_id: "thread-1",
+          message_id: "source-message",
+          mentioned_agent_ids: ["rex"],
+        },
+        text: "hello rex",
+      });
+
+      assert.equal(result.deliveries.length, 3);
+      assert.deepEqual(
+        delivered.map((item) => (item as PresenceInbound).runtime).sort(),
+        ["hermes", "hosted", "openclaw"],
+      );
+      assert.deepEqual(
+        delivered.map((item) => (item as PresenceInbound).agent_id),
+        ["rex", "rex", "rex"],
+      );
+    },
+  );
+});
+
+test("normalized mention messages route to non-default mentioned agents", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: unknown[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "rex",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+      });
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        discord: {
+          account_id: "discord-bot",
+          channel_id: "channel-1",
+          message_id: "source-message",
+          mentioned_agent_ids: ["rex"],
+        },
+        text: "rex only",
+      });
+
+      assert.equal(result.deliveries.length, 1);
+      assert.equal((delivered[0] as PresenceInbound).agent_id, "rex");
+    },
+  );
+});
+
+test("fanout ignores routes for unmentioned agents when the Discord event has mentions", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: unknown[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "rex",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+      });
+      await router.registerRoute({
+        route_id: "blaze",
+        runtime: "hermes",
+        agent_id: "blaze",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+      });
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        discord: {
+          account_id: "discord-bot",
+          channel_id: "channel-1",
+          message_id: "source-message",
+          mentioned_agent_ids: ["rex"],
+        },
+        text: "rex only",
+      });
+
+      assert.equal(result.deliveries.length, 1);
+      assert.equal((delivered[0] as PresenceInbound).agent_id, "rex");
+    },
+  );
+});
+
+test("unaddressed shared-channel Discord events do not fan out", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: unknown[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "rex",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+      });
+      await router.registerRoute({
+        route_id: "blaze",
+        runtime: "hermes",
+        agent_id: "blaze",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+      });
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        discord: {
+          account_id: "discord-bot",
+          channel_id: "channel-1",
+          message_id: "source-message",
+        },
+        text: "not addressed to a worker",
+      });
+
+      assert.equal(result.deliveries.length, 0);
+      assert.equal(delivered.length, 0);
+    },
+  );
 });
 
 test("applies outbound Discord intents through the bridge-owned client", async () => {

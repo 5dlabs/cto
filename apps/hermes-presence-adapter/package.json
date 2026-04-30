@@ -9,7 +9,7 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "node --test --import tsx \"src/**/*.test.ts\""
+    "test": "node --test --import tsx src/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

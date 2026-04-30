@@ -3,9 +3,11 @@ import path from "node:path";
 import type { DiscordHandle } from "./discord-client.js";
 import type { PresenceFabric } from "./presence-fabric.js";
 import {
+  validatePresenceDiscordEvent,
   validatePresenceInbound,
   validatePresenceOutbound,
   validatePresenceRoute,
+  type PresenceDiscordEvent,
   type PresenceInbound,
   type PresenceOutbound,
   type PresenceRoute,
@@ -16,6 +18,7 @@ export interface PresenceRouter {
   deleteRoute(routeId: string): Promise<boolean>;
   listRoutes(): PresenceRoute[];
   routeInbound(payload: unknown): Promise<{ accepted: true; route: PresenceRoute; workerStatus: number }>;
+  routeDiscordEvent(payload: unknown): Promise<{ accepted: true; deliveries: Array<{ route: PresenceRoute; workerStatus: number }> }>;
   handleOutbound(payload: unknown): Promise<{ accepted: true; message_id?: string }>;
 }
 
@@ -45,6 +48,41 @@ function routeScore(route: PresenceRoute, event: PresenceInbound): number {
   if (routeDiscord?.channel_id) score += 30;
   if (routeDiscord?.thread_id) score += 40;
   return score;
+}
+
+function routeDiscordScore(route: PresenceRoute, event: PresenceDiscordEvent): number {
+  let score = 0;
+  const mentioned = event.discord.mentioned_agent_ids;
+  if (mentioned?.length && !mentioned.includes(route.agent_id)) return -1;
+  if (!mentioned?.length && !event.agent_id) return -1;
+  if (event.agent_id && route.agent_id !== event.agent_id) return -1;
+
+  if (route.coderun_id && event.coderun_id && route.coderun_id === event.coderun_id) score += 100;
+  if (route.project_id && event.project_id && route.project_id === event.project_id) score += 20;
+  if (route.task_id && event.task_id && route.task_id === event.task_id) score += 20;
+
+  const routeDiscord = route.discord;
+  if (routeDiscord?.account_id && routeDiscord.account_id !== event.discord.account_id) return -1;
+  if (routeDiscord?.guild_id && routeDiscord.guild_id !== event.discord.guild_id) return -1;
+  if (routeDiscord?.channel_id && routeDiscord.channel_id !== event.discord.channel_id) return -1;
+  if (routeDiscord?.thread_id && routeDiscord.thread_id !== event.discord.thread_id) return -1;
+
+  if (routeDiscord?.guild_id) score += 10;
+  if (routeDiscord?.channel_id) score += 30;
+  if (routeDiscord?.thread_id) score += 40;
+  return score;
+}
+
+function eventForRoute(event: PresenceDiscordEvent, route: PresenceRoute): PresenceInbound {
+  return {
+    ...event,
+    runtime: route.runtime,
+    agent_id: route.agent_id,
+    project_id: event.project_id ?? route.project_id,
+    task_id: event.task_id ?? route.task_id,
+    coderun_id: event.coderun_id ?? route.coderun_id,
+    session_key: route.session_key,
+  };
 }
 
 function readRoutes(routeStorePath: string | undefined, logger: { warn: Function }): PresenceRoute[] {
@@ -208,6 +246,26 @@ export function createPresenceRouter(
       fabric?.publishInbound(result.value, route);
       const workerStatus = await postToWorker(route, result.value);
       return { accepted: true, route, workerStatus };
+    },
+
+    async routeDiscordEvent(payload): Promise<{ accepted: true; deliveries: Array<{ route: PresenceRoute; workerStatus: number }> }> {
+      const validation = validatePresenceDiscordEvent(payload);
+      if (!validation.ok) {
+        throw new Error(validation.error);
+      }
+      const event = validation.value;
+      const candidates = [...routes.values()]
+        .map((route) => ({ route, score: routeDiscordScore(route, event) }))
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => b.score - a.score);
+      const deliveries: Array<{ route: PresenceRoute; workerStatus: number }> = [];
+      for (const { route } of candidates) {
+        const inbound = eventForRoute(event, route);
+        fabric?.publishInbound(inbound, route);
+        const workerStatus = await postToWorker(route, inbound);
+        deliveries.push({ route, workerStatus });
+      }
+      return { accepted: true, deliveries };
     },
 
     async handleOutbound(payload): Promise<{ accepted: true; message_id?: string }> {

@@ -11,7 +11,7 @@ export function loadConfig(): AdapterConfig {
   const workerUrl = process.env.PRESENCE_WORKER_URL?.trim() || (podIp ? `http://${podIp}:${port}` : undefined);
   const routeId = process.env.PRESENCE_ROUTE_ID?.trim() || process.env.CODERUN_ID?.trim();
   const agentId = process.env.AGENT_ID?.trim();
-  const discordAccountId = process.env.DISCORD_ACCOUNT_ID?.trim();
+  const discordAccountId = process.env.DISCORD_ACCOUNT_ID?.trim() || process.env.PRESENCE_ACCOUNT_ID?.trim();
   const discordChannelId = process.env.PRESENCE_DISCORD_CHANNEL_ID?.trim() || process.env.DISCORD_CHANNEL_ID?.trim();
 
   return {

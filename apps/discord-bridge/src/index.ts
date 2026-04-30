@@ -4,6 +4,7 @@ import { RoomManager } from "./room-manager.js";
 import { createBridge } from "./bridge.js";
 import { createDiscordElicitationHandler } from "./elicitation-handler.js";
 import { createHttpServer } from "./http-server.js";
+import { normalizeDiscordMessage } from "./discord-normalizer.js";
 import { createPresenceFabric } from "./presence-fabric.js";
 import { createPresenceRouter } from "./presence-router.js";
 
@@ -58,6 +59,25 @@ async function main(): Promise<void> {
     presenceFabric,
     config.presenceSharedToken,
   );
+
+  discord.onMessage((message) => {
+    void (async () => {
+      const event = normalizeDiscordMessage(message, {
+        accountId: config.presenceAccountId,
+        defaultAgentId: config.presenceDefaultAgentId,
+        botUserId: message.client.user?.id,
+      });
+      if (!event) {
+        return;
+      }
+      const result = await presence.routeDiscordEvent(event);
+      if (result.deliveries.length > 0) {
+        logger.info(`Presence routed Discord message ${event.discord.message_id ?? "unknown"} to ${result.deliveries.length} worker(s)`);
+      }
+    })().catch((err) => {
+      logger.warn(`Presence Discord ingress failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  });
 
   // 7. Start HTTP notification server
   const httpServer = createHttpServer(

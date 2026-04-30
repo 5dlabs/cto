@@ -19,6 +19,10 @@ export interface BridgeConfig {
   natsUrl?: string;
   /** Shared bearer token required for /presence/* endpoints */
   presenceSharedToken?: string;
+  /** Stable account id used in normalized Discord presence events */
+  presenceAccountId: string;
+  /** Fallback agent id used before mention/route fanout selects runtime-specific agents */
+  presenceDefaultAgentId: string;
 }
 
 function defaultWorkspaceRoot(): string {
@@ -43,5 +47,7 @@ export function loadConfig(): BridgeConfig {
       process.env.PRESENCE_ROUTE_STORE_PATH?.trim() || `${defaultWorkspaceRoot()}/.intake/presence-routes.json`,
     natsUrl: process.env.NATS_URL?.trim() || undefined,
     presenceSharedToken: process.env.PRESENCE_SHARED_TOKEN?.trim() || undefined,
+    presenceAccountId: process.env.PRESENCE_ACCOUNT_ID?.trim() || "discord-bridge",
+    presenceDefaultAgentId: process.env.PRESENCE_DEFAULT_AGENT_ID?.trim() || "coder",
   };
 }
