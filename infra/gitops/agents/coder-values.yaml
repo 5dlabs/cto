@@ -2,7 +2,8 @@
 # =============================================================================
 # Coder Agent Values
 # =============================================================================
-# General-purpose coding agent for the CTO platform.
+# Dormant OpenClaw Coder definition kept for reference while Hermes owns the
+# production Coder Discord bot.
 # Primary focus: e2e testing of intake, work, play, and lobster workflows.
 # Primary CLI: Claude Code with agent teams enabled.
 # Secondary: OpenCode (Kimi K2 Turbo via Fireworks).
@@ -185,7 +186,7 @@ secrets:
 # =============================================================================
 messaging:
   discord:
-    enabled: true
+    enabled: false
     accountId: "coder"
     tokenSecretKey: "coder"
     allowBots: "mentions"
