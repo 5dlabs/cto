@@ -53,6 +53,9 @@ spec:
               case "$host" in
                 github.com|api.github.com)
                   token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+                  if [ -z "$token" ] && [ -r "{{ .Values.secrets.githubTokenFile }}" ]; then
+                    token="$(cat "{{ .Values.secrets.githubTokenFile }}")"
+                  fi
                   [ -n "$token" ] || exit 0
                   printf 'username=x-access-token\n'
                   printf 'password=%s\n' "$token"
@@ -117,7 +120,15 @@ spec:
               apt-get update -qq
               apt-get install -y --no-install-recommends ca-certificates curl gh >/dev/null
               mkdir -p {{ .Values.persistence.mountPath }}/home/bin
-              cp "$(command -v gh)" {{ .Values.persistence.mountPath }}/home/bin/gh
+              cp "$(command -v gh)" {{ .Values.persistence.mountPath }}/home/bin/gh-real
+              cat > {{ .Values.persistence.mountPath }}/home/bin/gh <<'EOF'
+              #!/bin/sh
+              if [ -z "${GH_TOKEN:-}" ] && [ -r "{{ .Values.secrets.githubTokenFile }}" ]; then
+                export GH_TOKEN="$(cat "{{ .Values.secrets.githubTokenFile }}")"
+              fi
+              exec {{ .Values.persistence.mountPath }}/home/bin/gh-real "$@"
+              EOF
+              sed -i 's/^              //' {{ .Values.persistence.mountPath }}/home/bin/gh
               KUBECTL_ARCH="amd64"
               case "$(uname -m)" in
                 aarch64|arm64)
@@ -126,8 +137,8 @@ spec:
               esac
               curl -fsSL -o {{ .Values.persistence.mountPath }}/home/bin/kubectl "https://dl.k8s.io/release/{{ .Values.kubectl.version }}/bin/linux/${KUBECTL_ARCH}/kubectl"
               chmod 755 {{ .Values.persistence.mountPath }}/home/bin/kubectl
-              chmod 755 {{ .Values.persistence.mountPath }}/home/bin/gh
-              chown 10000:10000 {{ .Values.persistence.mountPath }}/home/bin/gh {{ .Values.persistence.mountPath }}/home/bin/kubectl
+              chmod 755 {{ .Values.persistence.mountPath }}/home/bin/gh {{ .Values.persistence.mountPath }}/home/bin/gh-real
+              chown 10000:10000 {{ .Values.persistence.mountPath }}/home/bin/gh {{ .Values.persistence.mountPath }}/home/bin/gh-real {{ .Values.persistence.mountPath }}/home/bin/kubectl
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath | quote }}
@@ -155,6 +166,8 @@ spec:
               value: {{ .Values.persistence.mountPath | quote }}
             - name: WORKSPACE
               value: {{ .Values.workspace.mountPath | quote }}
+            - name: GH_TOKEN_FILE
+              value: {{ .Values.secrets.githubTokenFile | quote }}
             - name: HERMES_INFERENCE_PROVIDER
               value: {{ .Values.model.provider | quote }}
             - name: HERMES_MODEL
@@ -215,6 +228,9 @@ spec:
               mountPath: /usr/local/bin/kubectl
               subPath: home/bin/kubectl
               readOnly: true
+            - name: github-token
+              mountPath: {{ .Values.secrets.githubTokenMountPath | quote }}
+              readOnly: true
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.probes.liveness.enabled }}
@@ -242,6 +258,13 @@ spec:
         - name: config-template
           configMap:
             name: {{ include "hermes-gateway.fullname" . }}-config
+        - name: github-token
+          secret:
+            secretName: {{ .Values.secrets.githubSecretName | quote }}
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.secrets.githubSecretKey | quote }}
+                path: token
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
