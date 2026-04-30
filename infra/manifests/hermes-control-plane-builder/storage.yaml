@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cto-hermes-coder-control-data
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: hermes-gateway
+    app.kubernetes.io/instance: cto-hermes-coder-control
+    app.kubernetes.io/component: control-plane-builder
+    app.kubernetes.io/part-of: cto-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
