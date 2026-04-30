@@ -10,6 +10,7 @@
           "allowedModels": [
             "github-copilot/claude-opus-4.6",
             "github-copilot/claude-sonnet-4.6",
+            "github-copilot/gpt-5.5",
             "github-copilot/gpt-5.4",
             "github-copilot/gpt-5.2",
             "github-copilot/gpt-5.2-codex",

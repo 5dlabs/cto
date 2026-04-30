@@ -567,85 +567,127 @@ steps:
       mkdir -p .tasks/audio .intake/audio
       RESULT_FILE="$(mktemp)"
       printf '%s' "$CTO_ASSEMBLE_RESULT" > "$RESULT_FILE"
-      # Guard: if assemble result is empty or not valid JSON, write a fallback transcript
-      if [ ! -s "$RESULT_FILE" ] || ! jq -e '.' "$RESULT_FILE" >/dev/null 2>&1; then
-        echo "write-architecture-audio-transcript: assemble result empty or invalid JSON — writing fallback transcript" >&2
-        jq -n --arg session_id "${session_id}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-          '{kind:"architecture-deliberation",sessionId:$session_id,generatedAt:$ts,segments:[{speaker:"narrator",label:"Architecture Deliberation",text:"Architecture deliberation transcript could not be generated — source data was unavailable."}]}' \
-          > .tasks/audio/architecture-deliberation.transcript.json
-        rm -f "$RESULT_FILE"
-        printf '%s\n' ".tasks/audio/architecture-deliberation.transcript.json"
-        exit 0
-      fi
-      jq -n \
-        --slurpfile result "$RESULT_FILE" \
-        --arg session_id "${session_id}" \
-        --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-        '
-          ($result[0] // {}) as $r |
-          {
-            kind: "architecture-deliberation",
-            sessionId: $session_id,
-            generatedAt: $generated_at,
-            segments: (
-              [
-                {
-                  speaker: "narrator",
-                  label: "Architecture Deliberation",
-                  text: (
-                    "Architecture deliberation for session " + $session_id + ". "
-                    + (($r.decision_points // []) | length | tostring) + " decision points were considered."
-                  )
-                }
-              ]
-              + (
-                  ($r.debate_log // [])
-                  | map(
-                      select((.content // "") | length > 0)
-                      | {
-                          speaker: (.speaker // "narrator"),
-                          label: (
-                            ((.speaker // "speaker") | ascii_upcase)
-                            + (if (.turn? != null) then " turn " + (.turn | tostring) else "" end)
-                          ),
-                          text: (.content // "")
-                        }
-                    )
-                )
-              + [
-                {
-                  speaker: "compiler",
-                  label: "Resolution Summary",
-                  text: (
-                    "Deliberation complete. Status: " + (($r.status // "unknown") | tostring) + ". "
-                    + "Resolved " + (($r.resolved_decisions // []) | length | tostring)
-                    + " of " + (($r.decision_points // []) | length | tostring) + " decisions. "
-                    + (if (($r.resolved_decisions // []) | length) > 0 then
-                        "Winning decisions: "
-                        + (
-                            ($r.resolved_decisions // [])
-                            | map(
-                                (.decision_id // .id // "decision")
-                                + " chose "
-                                + ((.winning_option // .winner // "an option") | tostring)
-                              )
-                            | join("; ")
-                          )
-                      else
-                        "No decisions were resolved."
-                      end)
-                  )
-                }
-              ]
-            )
+      python3 - "$RESULT_FILE" ".tasks/audio/architecture-deliberation.transcript.json" "${session_id}" <<'PY'
+      import json
+      import re
+      import sys
+      from datetime import datetime, timezone
+      from pathlib import Path
+
+      result_path = Path(sys.argv[1])
+      out_path = Path(sys.argv[2])
+      session_id = sys.argv[3]
+
+      def now_iso() -> str:
+          return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+      def role(raw: object) -> str:
+          value = str(raw or '').lower()
+          if value == 'optimist':
+              return 'optimus'
+          if value == 'pessimist':
+              return 'pessimus'
+          if value == 'compiler':
+              return 'praxis'
+          if value == 'designer':
+              return 'veritas'
+          if value in {'morgan', 'optimus', 'pessimus', 'praxis', 'rook', 'veritas'}:
+              return value
+          return 'praxis'
+
+      def label_for(speaker: str) -> str:
+          return {
+              'morgan': 'Morgan',
+              'optimus': 'Optimus',
+              'pessimus': 'Pessimus',
+              'praxis': 'Praxis',
+              'rook': 'Rook',
+              'veritas': 'Veritas',
+          }.get(speaker, speaker.upper())
+
+      def clean_text(text: object) -> str:
+          return re.sub(r'\s+', ' ', str(text or '')).strip()[:1800]
+
+      def with_handoff(speaker: str, text: object) -> str:
+          cleaned = clean_text(text)
+          if speaker == 'morgan':
+              return cleaned
+          prefix = f"I am {label_for(speaker)}. "
+          if re.search(r'back to you[, ]+morgan', cleaned, re.IGNORECASE):
+              return prefix + cleaned
+          return prefix + cleaned + ' Back to you Morgan.'
+
+      try:
+          data = json.loads(result_path.read_text() or '{}')
+          if not isinstance(data, dict):
+              raise ValueError('assemble result was not an object')
+      except Exception:
+          data = {
+              'status': 'unavailable',
+              'decision_points': [],
+              'resolved_decisions': [],
+              'debate_log': [],
+              '_fallback_reason': 'source data unavailable',
           }
-        ' > "$RESULT_FILE.transcript" && mv "$RESULT_FILE.transcript" .tasks/audio/architecture-deliberation.transcript.json || {
-        echo "write-architecture-audio-transcript: jq template failed — writing fallback" >&2
-        jq -n --arg session_id "${session_id}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-          '{kind:"architecture-deliberation",sessionId:$session_id,generatedAt:$ts,segments:[{speaker:"narrator",label:"Architecture Deliberation",text:"Architecture deliberation transcript generation failed during template rendering."}]}' \
-          > .tasks/audio/architecture-deliberation.transcript.json
-      }
-      rm -f "$RESULT_FILE" "$RESULT_FILE.transcript"
+
+      segments = [{
+          'speaker': 'morgan',
+          'label': 'Morgan',
+          'text': (
+              f'I am Morgan. I am facilitating this architecture deliberation for session {session_id}. '
+              'We are reviewing the generated project scope, implementation risks, and resolved decisions using the selected committee voices.'
+          ),
+      }]
+
+      debate_log = data.get('debate_log') if isinstance(data.get('debate_log'), list) else []
+      for item in debate_log:
+          if not isinstance(item, dict):
+              continue
+          content = clean_text(item.get('content'))
+          if not content:
+              continue
+          speaker = role(item.get('speaker'))
+          label = label_for(speaker)
+          if item.get('turn') is not None:
+              label = f"{label} turn {item.get('turn')}"
+          segments.append({'speaker': speaker, 'label': label, 'text': with_handoff(speaker, content)})
+
+      if not debate_log:
+          segments.append({
+              'speaker': 'morgan',
+              'label': 'Morgan Source Notice',
+              'text': 'I am Morgan. Architecture deliberation source debate data was unavailable; no Praxis or sample transcript content was substituted.',
+          })
+
+      decisions = data.get('decision_points') if isinstance(data.get('decision_points'), list) else []
+      resolved = data.get('resolved_decisions') if isinstance(data.get('resolved_decisions'), list) else []
+      if resolved:
+          winning = []
+          for decision in resolved:
+              if isinstance(decision, dict):
+                  winning.append(f"{decision.get('decision_id') or decision.get('id') or 'decision'} chose {decision.get('winning_option') or decision.get('winner') or 'an option'}")
+          suffix = ' Winning decisions: ' + '; '.join(winning)
+      else:
+          suffix = ' No explicit decision points were resolved; the generated plan remains the source of truth.'
+      segments.append({
+          'speaker': 'morgan',
+          'label': 'Morgan Resolution Summary',
+          'text': (
+              f"Morgan back on point. Deliberation complete. Status: {data.get('status', 'unknown')}. "
+              f"Resolved {len(resolved)} of {len(decisions)} decisions." + suffix
+          ),
+      })
+
+      out_path.parent.mkdir(parents=True, exist_ok=True)
+      out_path.write_text(json.dumps({
+          'kind': 'architecture-deliberation',
+          'sessionId': session_id,
+          'generatedAt': now_iso(),
+          'voiceProfile': 'morgan-committee-v1',
+          'segments': segments,
+      }, indent=2) + '\n')
+      PY
+      rm -f "$RESULT_FILE"
       printf '%s\n' ".tasks/audio/architecture-deliberation.transcript.json"
 
   - id: launch-architecture-audio-export

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Real-model LLM adapter for CTO intake's OpenClaw-compatible llm-task argv.
 
-Supports Anthropic Messages API and Google Gemini generateContent via stdlib urllib.
+Supports Anthropic Messages API, Google Gemini generateContent, OpenAI chat
+completions, and explicitly configured GitHub Copilot harness commands.
 Secrets are read from env only and never printed.
 """
 from __future__ import annotations
@@ -10,12 +11,22 @@ import argparse
 import json
 import os
 import re
+import shlex
+import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+
+class ProviderUnavailable(RuntimeError):
+    def __init__(self, provider: str, model: str, reason: str):
+        self.provider = provider
+        self.model = model
+        self.reason = reason
+        super().__init__(reason)
 
 
 def load_payload(ns: argparse.Namespace) -> dict[str, Any]:
@@ -84,7 +95,6 @@ def extract_json(text: str) -> Any:
         return json.loads(text)
     except Exception:
         pass
-    # Best-effort extract first top-level object/array.
     starts = [i for i in (text.find("{"), text.find("[")) if i >= 0]
     if not starts:
         raise ValueError("model returned no JSON object/array")
@@ -110,7 +120,7 @@ def extract_json(text: str) -> Any:
             elif ch == closer:
                 depth -= 1
                 if depth == 0:
-                    return json.loads(text[start:i+1])
+                    return json.loads(text[start : i + 1])
     raise ValueError("could not parse JSON from model output")
 
 
@@ -129,15 +139,57 @@ def http_json(url: str, headers: dict[str, str], body: dict[str, Any], timeout: 
                 break
         except Exception as exc:
             last = exc
-        time.sleep(2 ** attempt)
+        time.sleep(2**attempt)
     raise last or RuntimeError("request failed")
+
+
+def normalize_provider(provider: str) -> str:
+    value = (provider or "").strip().lower()
+    aliases = {
+        "": "",
+        "google": "gemini",
+        "google-gemini": "gemini",
+        "chatgpt": "openai",
+        "gpt": "openai",
+        "copilot": "github-copilot",
+        "github": "github-copilot",
+    }
+    return aliases.get(value, value)
+
+
+def requested_provider_model(payload: dict[str, Any]) -> tuple[str, str, bool]:
+    raw_provider = str(payload.get("provider") or "").strip()
+    raw_model = str(payload.get("model") or "").strip()
+    explicit = bool(raw_provider)
+    provider = normalize_provider(raw_provider)
+    model = raw_model
+    if not provider:
+        provider = normalize_provider(os.environ.get("REAL_LLM_PROVIDER", "anthropic"))
+        model = model or os.environ.get("REAL_LLM_MODEL", "")
+    return provider, model, explicit
+
+
+def capabilities() -> dict[str, Any]:
+    copilot_cmd = os.environ.get("COPILOT_LLM_INVOKE_CMD") or os.environ.get("CTO_COPILOT_LLM_INVOKE_CMD")
+    return {
+        "providers": {
+            "github-copilot": {
+                "available": bool(copilot_cmd),
+                "models": ["gpt-5.5"],
+                "invoke": "configured-command" if copilot_cmd else "unconfigured",
+                "requires": "COPILOT_LLM_INVOKE_CMD or CTO_COPILOT_LLM_INVOKE_CMD",
+            },
+            "openai": {"available": bool(os.environ.get("OPENAI_API_KEY")), "models": [os.environ.get("OPENAI_MODEL") or os.environ.get("CHATGPT_MODEL") or "gpt-5.5"]},
+            "anthropic": {"available": bool(os.environ.get("ANTHROPIC_API_KEY")), "models": [os.environ.get("ANTHROPIC_MODEL") or "claude-sonnet-4-5-20250929"]},
+            "gemini": {"available": bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")), "models": [os.environ.get("GEMINI_MODEL") or "gemini-3.1-pro-preview"]},
+        }
+    }
 
 
 def call_anthropic(model: str, system: str, user: str, action: str) -> str:
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
-        raise RuntimeError("ANTHROPIC_API_KEY missing")
-    # Map future/alias names to available public names only if needed.
+        raise ProviderUnavailable("anthropic", model, "ANTHROPIC_API_KEY missing")
     aliases = {
         "claude-opus-4-7-20260610": "claude-opus-4-1-20250805",
         "claude-opus-4-7": "claude-opus-4-1-20250805",
@@ -145,7 +197,7 @@ def call_anthropic(model: str, system: str, user: str, action: str) -> str:
         "claude-sonnet-4-6": "claude-sonnet-4-5-20250929",
         "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
     }
-    wire_model = aliases.get(model, model or "claude-sonnet-4-5-20250929")
+    wire_model = aliases.get(model, model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929"))
     body = {
         "model": wire_model,
         "max_tokens": int(os.environ.get("REAL_LLM_MAX_TOKENS", "6000")),
@@ -157,11 +209,7 @@ def call_anthropic(model: str, system: str, user: str, action: str) -> str:
         body["messages"][0]["content"] += "\n\nReturn valid JSON only."
     resp = http_json(
         "https://api.anthropic.com/v1/messages",
-        {
-            "content-type": "application/json",
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-        },
+        {"content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01"},
         body,
     )
     parts = resp.get("content", [])
@@ -171,7 +219,7 @@ def call_anthropic(model: str, system: str, user: str, action: str) -> str:
 def call_gemini(model: str, system: str, user: str, action: str) -> str:
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
-        raise RuntimeError("GEMINI_API_KEY/GOOGLE_API_KEY missing")
+        raise ProviderUnavailable("gemini", model, "GEMINI_API_KEY/GOOGLE_API_KEY missing")
     wire_model = model or os.environ.get("GEMINI_MODEL", "gemini-3.1-pro-preview")
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
@@ -187,16 +235,76 @@ def call_gemini(model: str, system: str, user: str, action: str) -> str:
     return "".join(part.get("text", "") for part in parts if isinstance(part, dict))
 
 
-def choose_provider(payload: dict[str, Any]) -> tuple[str, str]:
-    provider = str(payload.get("provider") or os.environ.get("REAL_LLM_PROVIDER") or "").lower()
-    model = str(payload.get("model") or os.environ.get("REAL_LLM_MODEL") or "")
-    # GitHub Copilot provider is not directly API-addressable here; use Anthropic key as real model backend.
-    if provider in ("", "github-copilot", "copilot"):
-        provider = os.environ.get("REAL_LLM_PROVIDER", "anthropic").lower()
-        model = os.environ.get("REAL_LLM_MODEL", model)
-    if provider in ("google", "gemini", "google-gemini"):
-        return "gemini", model
-    return "anthropic", model
+def call_openai(model: str, system: str, user: str, action: str) -> str:
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        raise ProviderUnavailable("openai", model, "OPENAI_API_KEY missing")
+    wire_model = model or os.environ.get("OPENAI_MODEL") or os.environ.get("CHATGPT_MODEL") or "gpt-5.5"
+    body = {
+        "model": wire_model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user + ("\n\nReturn valid JSON only." if action == "json" else "")},
+        ],
+        "temperature": float(os.environ.get("REAL_LLM_TEMPERATURE", "0.2")),
+        "max_tokens": int(os.environ.get("REAL_LLM_MAX_TOKENS", "6000")),
+    }
+    resp = http_json("https://api.openai.com/v1/chat/completions", {"content-type": "application/json", "authorization": f"Bearer {key}"}, body)
+    choices = resp.get("choices", [])
+    if not choices:
+        return ""
+    message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+    content = message.get("content", "") if isinstance(message, dict) else ""
+    if isinstance(content, list):
+        return "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    return str(content)
+
+
+def call_copilot(model: str, system: str, user: str, action: str, payload: dict[str, Any]) -> str:
+    cmd_text = os.environ.get("COPILOT_LLM_INVOKE_CMD") or os.environ.get("CTO_COPILOT_LLM_INVOKE_CMD")
+    if not cmd_text:
+        raise ProviderUnavailable(
+            "github-copilot",
+            model or "gpt-5.5",
+            "No Copilot LLM harness configured. Set COPILOT_LLM_INVOKE_CMD to a command that accepts provider/model/system/user/action JSON on stdin.",
+        )
+    cmd = shlex.split(cmd_text)
+    request = {
+        "provider": "github-copilot",
+        "model": model or "gpt-5.5",
+        "action": action,
+        "system": system,
+        "user": user,
+        "payload": payload,
+    }
+    try:
+        proc = subprocess.run(
+            cmd,
+            input=json.dumps(request, ensure_ascii=False),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=int(os.environ.get("COPILOT_LLM_INVOKE_TIMEOUT", "300")),
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise ProviderUnavailable("github-copilot", model or "gpt-5.5", f"Copilot harness command not found: {exc.filename}") from exc
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "copilot harness failed").strip()[:1000]
+        raise RuntimeError(f"github-copilot harness failed: {err}")
+    return proc.stdout.strip()
+
+
+def call_provider(provider: str, model: str, system: str, user: str, action: str, payload: dict[str, Any]) -> str:
+    if provider == "github-copilot":
+        return call_copilot(model, system, user, action, payload)
+    if provider == "gemini":
+        return call_gemini(model, system, user, action)
+    if provider == "openai":
+        return call_openai(model, system, user, action)
+    if provider == "anthropic":
+        return call_anthropic(model, system, user, action)
+    raise ProviderUnavailable(provider, model, f"Unsupported provider: {provider}")
 
 
 def main() -> int:
@@ -206,14 +314,30 @@ def main() -> int:
     parser.add_argument("--args-json")
     parser.add_argument("--args-file")
     ns, _ = parser.parse_known_args()
-    payload = load_payload(ns)
     action = ns.action or "json"
+    if ns.tool == "provider-capabilities":
+        print(json.dumps(capabilities(), ensure_ascii=False))
+        return 0
+    payload = load_payload(ns)
     system, user = build_messages(payload, action)
-    provider, model = choose_provider(payload)
-    if provider == "gemini":
-        text = call_gemini(model, system, user, action)
-    else:
-        text = call_anthropic(model, system, user, action)
+    provider, model, _explicit = requested_provider_model(payload)
+    try:
+        text = call_provider(provider, model, system, user, action, payload)
+    except ProviderUnavailable as exc:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": "provider_unavailable",
+                    "requested_provider": exc.provider,
+                    "requested_model": exc.model,
+                    "reason": exc.reason,
+                },
+                ensure_ascii=False,
+            ),
+            file=sys.stderr,
+        )
+        return 42
     if action == "json":
         try:
             obj = extract_json(text)

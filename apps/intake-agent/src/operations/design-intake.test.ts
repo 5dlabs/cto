@@ -67,6 +67,43 @@ describe('design intake provider modes', () => {
     expect(componentLibrary.tokens).toBeDefined();
   });
 
+  test('emits a self-contained importable design bundle with routes, snapshots, style guide, and React components', async () => {
+    const outputDir = join(workDir, 'bundle');
+    const result = await designIntake({
+      prd_content: 'Build a React web storefront with dashboard routes for inventory, quotes, rentals, and customer management.',
+      design_prompt: 'Google Stitch style export with importable components and route snapshots.',
+      design_mode: 'ingest_plus_stitch',
+      output_dir: outputDir,
+      project_name: 'sigma-1',
+    });
+
+    expect(result.design_bundle?.format).toBe('self-contained-react-design-bundle');
+
+    const routesMarkdown = await readFile(join(outputDir, 'routes.md'), 'utf-8');
+    expect(routesMarkdown).toContain('![Route snapshot: /]');
+    expect(routesMarkdown).toContain('components/routes/HomeRoute.tsx');
+    expect(routesMarkdown).toContain('./design-system.md');
+
+    const homeRoute = await readFile(join(outputDir, 'components', 'routes', 'HomeRoute.tsx'), 'utf-8');
+    expect(homeRoute).toContain('export function HomeRoute');
+    expect(homeRoute).toContain("from '../ui/Button'");
+
+    const index = await readFile(join(outputDir, 'components', 'index.ts'), 'utf-8');
+    expect(index).toContain("export * from './routes/HomeRoute'");
+
+    const css = await readFile(join(outputDir, 'styles', 'tokens.css'), 'utf-8');
+    expect(css).toContain('--color-accent-brand');
+
+    const manifest = JSON.parse(await readFile(join(outputDir, 'design-bundle.json'), 'utf-8')) as {
+      routes?: unknown[];
+      assets?: unknown[];
+      components?: unknown[];
+    };
+    expect(manifest.routes?.length).toBeGreaterThan(0);
+    expect(manifest.assets?.length).toBeGreaterThan(0);
+    expect(manifest.components?.length).toBeGreaterThan(0);
+  });
+
   test('framer mode emits framer candidates and normalized output', async () => {
     process.env.FRAMER_API_KEY = 'framer-test-key';
     process.env.FRAMER_PROJECT_URL = 'https://framer.com/projects/test';

@@ -24,7 +24,9 @@ interface DocEntry {
 }
 
 interface SubtaskEntry {
-  subtask_id: number;
+  subtask_id?: number | string | null;
+  id?: number | string | null;
+  title?: string;
   prompt_md: string;
 }
 
@@ -148,8 +150,13 @@ export async function writeFiles(
       paths.push(path.join(taskDir, 'prompt.xml'));
 
       if (prompt.subtasks && prompt.subtasks.length > 0) {
+        let subtaskIndex = 0;
         for (const st of prompt.subtasks) {
-          const stDir = path.join(taskDir, 'subtasks', `task-${prompt.task_id}.${st.subtask_id}`);
+          subtaskIndex += 1;
+          const rawSubtaskId = st.subtask_id ?? st.id ?? subtaskIndex;
+          const normalizedSubtaskId = String(rawSubtaskId).trim() || String(subtaskIndex);
+          const safeSubtaskId = normalizedSubtaskId.replace(/[^A-Za-z0-9._-]/g, '-');
+          const stDir = path.join(taskDir, 'subtasks', `task-${prompt.task_id}.${safeSubtaskId}`);
           await fs.mkdir(stDir, { recursive: true });
           await fs.writeFile(path.join(stDir, 'prompt.md'), asText(st.prompt_md));
           paths.push(path.join(stDir, 'prompt.md'));
