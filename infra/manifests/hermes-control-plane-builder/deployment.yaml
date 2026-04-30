@@ -45,7 +45,32 @@ spec:
             - -c
             - |
               set -eu
-              mkdir -p "/opt/data" "/opt/data/workspace" /opt/data/home/bin /opt/data/home/.kube
+              mkdir -p "/opt/data" "/opt/data/workspace" /opt/data/home/bin /opt/data/home/.kube /opt/data/home/.codex /opt/data/workspace/.codex /opt/data/workspace/.claude /opt/data/npm-global /opt/data/bin
+              if command -v npm >/dev/null 2>&1; then
+                npm config set prefix /opt/data/npm-global >/dev/null
+                if [ ! -x /opt/data/npm-global/bin/claude ]; then
+                  npm install -g @anthropic-ai/claude-code@2.1.119 --no-audit --no-fund
+                fi
+                if [ ! -x /opt/data/npm-global/bin/claude-agent-acp ]; then
+                  npm install -g @agentclientprotocol/claude-agent-acp@0.30.0 --no-audit --no-fund
+                fi
+                if [ ! -x /opt/data/npm-global/bin/codex ]; then
+                  npm install -g @openai/codex@0.125.0 --no-audit --no-fund
+                fi
+                ln -sf /opt/data/npm-global/bin/claude /opt/data/bin/claude
+                ln -sf /opt/data/npm-global/bin/claude-agent-acp /opt/data/bin/claude-agent-acp
+                ln -sf /opt/data/npm-global/bin/codex /opt/data/bin/codex
+              fi
+              if [ -n "${CODEX_AUTH_SUB1:-}" ]; then
+                printf '%s' "$CODEX_AUTH_SUB1" > /opt/data/home/.codex/auth.json
+                printf '%s' "$CODEX_AUTH_SUB1" > /opt/data/workspace/.codex/auth.json
+                chmod 600 /opt/data/home/.codex/auth.json /opt/data/workspace/.codex/auth.json
+              fi
+              if [ -n "${CODEX_AUTH_SUB2:-}" ]; then
+                printf '%s' "$CODEX_AUTH_SUB2" > /opt/data/home/.codex/auth-sub2.json
+                printf '%s' "$CODEX_AUTH_SUB2" > /opt/data/workspace/.codex/auth-sub2.json
+                chmod 600 /opt/data/home/.codex/auth-sub2.json /opt/data/workspace/.codex/auth-sub2.json
+              fi
               cp /config-template/config.yaml /opt/data/config.yaml
               cp /config-template/SOUL.md /opt/data/SOUL.md
               cp /config-template/AGENTS.md /opt/data/workspace/AGENTS.md
@@ -116,6 +141,19 @@ spec:
               mountPath: /opt/data
             - name: config-template
               mountPath: /config-template
+          env:
+            - name: CODEX_AUTH_SUB1
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: codex-auth-sub1
+                  optional: false
+            - name: CODEX_AUTH_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: codex-auth-sub2
+                  optional: false
         - name: install-runtime-tools
           image: docker.io/debian:trixie-slim
           imagePullPolicy: IfNotPresent
@@ -187,6 +225,38 @@ spec:
               value: "1"
             - name: HERMES_AGENT_PURPOSE
               value: control-plane-builder
+            - name: CLAUDE_CONFIG_DIR
+              value: /opt/data/workspace/.claude
+            - name: CLAUDE_CODE_OAUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: anthropic-sub1-oauth
+                  optional: false
+            - name: CLAUDE_CODE_OAUTH_TOKEN_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: anthropic-sub2-oauth
+                  optional: false
+            - name: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+              value: "1"
+            - name: CODEX_AUTH_SUB1
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: codex-auth-sub1
+                  optional: false
+            - name: CODEX_AUTH_SUB2
+              valueFrom:
+                secretKeyRef:
+                  name: cto-coder-api-keys
+                  key: codex-auth-sub2
+                  optional: false
+            - name: DISABLE_AUTOUPDATER
+              value: "1"
+            - name: DISABLE_TELEMETRY
+              value: "1"
             - name: DD_SERVICE
               value: cto-hermes-coder-control
             - name: DISCORD_BOT_TOKEN
