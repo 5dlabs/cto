@@ -1749,8 +1749,8 @@ steps:
       printf '%s' "$CTO_INVENTORY_SKILLS" > "$SKILLS_FILE"
       python3 "$root/intake/scripts/compute-gaps.py" \
         --capabilities "$CAPS_FILE" \
-        --tools "$TOOLS_FILE" \
-        --skills "$SKILLS_FILE" \
+        --inventory-tools "$TOOLS_FILE" \
+        --inventory-skills "$SKILLS_FILE" \
         --registry "$REGISTRY"
 
   - id: query-tools-catalog
