@@ -68,7 +68,7 @@ When hasFrontend is false:
   <starting_id>{{next_id}}</starting_id>
 </parameters>
 
-Generate the specified number of tasks, each representing a single deployable unit of work for one agent.
+Generate the specified number of tasks, each representing a single deployable unit of work for one agent. If <num_tasks> is "auto" or otherwise asks for scope-based decomposition, generate as many top-level tasks as the project naturally requires instead of compressing scope. For large multi-portal / mobile / integration platforms, prefer a thorough task graph (often 15-40 top-level tasks) with clear domains over a tiny set of umbrella tasks.
 
 <process>
 1. Read the entire PRD — identify all services, components, and cross-cutting concerns

@@ -127,6 +127,13 @@ export interface DesignContextResult {
     path: string;
     format: 'markdown';
   };
+  design_bundle?: {
+    path: string;
+    manifest_path: string;
+    routes_markdown_path: string;
+    components_index_path: string;
+    format: 'self-contained-react-design-bundle';
+  };
 }
 
 interface ProviderExecutionContext {
@@ -144,11 +151,6 @@ interface ProviderExecutionContext {
 interface DesignProviderHandler {
   name: DesignProvider;
   generate(context: ProviderExecutionContext, outputDir: string): Promise<ProviderSummary>;
-}
-
-async function dynamicImport(moduleName: string): Promise<unknown> {
-  const importer = new Function('moduleName', 'return import(moduleName);') as (moduleName: string) => Promise<unknown>;
-  return importer(moduleName);
 }
 
 function collectScreenRefs(value: unknown, out: ScreenRef[]): void {
@@ -858,6 +860,180 @@ function getProviderHandlers(): Record<DesignProvider, DesignProviderHandler> {
   };
 }
 
+
+function pascalCase(value: string): string {
+  const cleaned = value.replace(/[^A-Za-z0-9]+/g, ' ').trim();
+  const base = cleaned || 'Route';
+  return base
+    .split(/\s+/g)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+}
+
+function inferRoutes(projectName: string, input: string, targets: FrontendTarget[]): Array<{ path: string; name: string; description: string }> {
+  const text = `${projectName}\n${input}`.toLowerCase();
+  const routes: Array<{ path: string; name: string; description: string }> = [
+    { path: '/', name: 'Home', description: 'Public landing page and conversion entry point.' },
+  ];
+  const add = (path: string, name: string, description: string) => {
+    if (!routes.some((route) => route.path === path)) routes.push({ path, name, description });
+  };
+  if (/inventory|catalog|equipment|product/.test(text)) add('/inventory', 'Inventory', 'Equipment inventory and product catalog workspace.');
+  if (/quote|cart|checkout|reservation/.test(text)) add('/quotes', 'Quotes', 'Quote builder, cart, and reservation flow.');
+  if (/rental|booking|order/.test(text)) add('/rentals', 'Rentals', 'Rental lifecycle management, availability, and fulfillment.');
+  if (/customer|crm|client/.test(text)) add('/customers', 'Customers', 'Customer account, CRM, and communication views.');
+  if (/dashboard|admin|ops|operation/.test(text)) add('/dashboard', 'Dashboard', 'Operational dashboard for Morgan and staff.');
+  if (targets.includes('mobile')) add('/mobile', 'Mobile', 'Mobile-first companion experience.');
+  return routes.slice(0, 8);
+}
+
+function routeSnapshotSvg(route: { path: string; name: string; description: string }, projectName: string): string {
+  const title = `${projectName} · ${route.name}`.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const desc = route.description.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#08111f"/><stop offset="0.45" stop-color="#111827"/><stop offset="1" stop-color="#2d1457"/></linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#21d4fd"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="14" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1440" height="960" fill="url(#bg)"/>
+  <circle cx="1180" cy="160" r="180" fill="#7c5cff" opacity="0.18" filter="url(#glow)"/>
+  <circle cx="220" cy="820" r="220" fill="#21d4fd" opacity="0.12" filter="url(#glow)"/>
+  <rect x="96" y="80" width="1248" height="800" rx="36" fill="#0f172a" opacity="0.88" stroke="#334155"/>
+  <rect x="136" y="120" width="1168" height="76" rx="20" fill="#111827" stroke="#293548"/>
+  <text x="172" y="169" fill="#f8fafc" font-family="Inter, Arial" font-size="28" font-weight="700">${title}</text>
+  <text x="1130" y="168" fill="#a5b4fc" font-family="Inter, Arial" font-size="20">${route.path}</text>
+  <rect x="152" y="260" width="540" height="250" rx="28" fill="#172033" stroke="#2a3b58"/>
+  <text x="188" y="326" fill="#ffffff" font-family="Inter, Arial" font-size="54" font-weight="800">${route.name}</text>
+  <text x="190" y="376" fill="#cbd5e1" font-family="Inter, Arial" font-size="24">${desc}</text>
+  <rect x="188" y="426" width="190" height="56" rx="18" fill="url(#accent)"/>
+  <text x="226" y="462" fill="#ffffff" font-family="Inter, Arial" font-size="20" font-weight="700">Open flow</text>
+  <rect x="748" y="260" width="500" height="250" rx="28" fill="#111827" stroke="#2a3b58"/>
+  <rect x="792" y="310" width="412" height="32" rx="16" fill="#334155"/>
+  <rect x="792" y="366" width="360" height="24" rx="12" fill="#475569"/>
+  <rect x="792" y="414" width="250" height="24" rx="12" fill="#475569"/>
+  <rect x="152" y="570" width="1096" height="210" rx="28" fill="#101827" stroke="#2a3b58"/>
+  <rect x="196" y="620" width="280" height="112" rx="22" fill="#182235"/>
+  <rect x="520" y="620" width="280" height="112" rx="22" fill="#182235"/>
+  <rect x="844" y="620" width="280" height="112" rx="22" fill="#182235"/>
+</svg>\n`;
+}
+
+function routeComponentSource(route: { path: string; name: string; description: string }, projectName: string): string {
+  const componentName = `${pascalCase(route.name)}Route`;
+  const safeTitle = `${projectName} ${route.name}`.replace(/`/g, '\\`');
+  const safeDescription = route.description.replace(/`/g, '\\`');
+  return `import { Button } from '../ui/Button';\nimport { Card } from '../ui/Card';\n\nexport function ${componentName}() {\n  return (\n    <main className="min-h-screen bg-[var(--color-background-base)] text-[var(--color-text-primary)]">\n      <section className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-20">\n        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--color-accent-brand)]">${route.path}</p>\n        <h1 className="text-5xl font-bold tracking-tight">${safeTitle}</h1>\n        <p className="max-w-3xl text-lg text-[var(--color-text-secondary)]">${safeDescription}</p>\n        <div className="flex gap-3">\n          <Button>Start with Morgan</Button>\n          <Button variant="secondary">View design notes</Button>\n        </div>\n        <div className="grid gap-4 md:grid-cols-3">\n          <Card title="Fast intake" description="Capture requests, source context, and operational constraints." />\n          <Card title="Reusable workflow" description="Route the same design primitives through web, mobile, and admin surfaces." />\n          <Card title="Implementation ready" description="Prompts, components, tokens, and route snapshots stay colocated." />\n        </div>\n      </section>\n    </main>\n  );\n}\n`;
+}
+
+async function writeDesignBundleArtifacts(
+  outputDir: string,
+  context: Pick<DesignContextResult, 'projectName' | 'prompt' | 'providerMode' | 'normalized_candidates' | 'frontendTargets' | 'providers' | 'urls' | 'crawledUrls'>,
+): Promise<{ bundleDir: string; manifestPath: string; routesMarkdownPath: string; componentsIndexPath: string }> {
+  const assetsDir = join(outputDir, 'assets');
+  const snapshotDir = join(assetsDir, 'snapshots');
+  const componentsDir = join(outputDir, 'components');
+  const routesDir = join(componentsDir, 'routes');
+  const uiDir = join(componentsDir, 'ui');
+  const stylesDir = join(outputDir, 'styles');
+  await mkdir(snapshotDir, { recursive: true });
+  await mkdir(routesDir, { recursive: true });
+  await mkdir(uiDir, { recursive: true });
+  await mkdir(stylesDir, { recursive: true });
+
+  const routeSeed = [context.prompt, ...context.urls, ...context.crawledUrls.map((url) => `${url.title || ''} ${url.snippet || ''}`)].join('\n');
+  const routes = inferRoutes(context.projectName, routeSeed, context.frontendTargets);
+  const components: Array<{ name: string; path: string; route?: string }> = [];
+  const assets: Array<{ kind: string; path: string; route?: string; source_url?: string }> = [];
+
+  const tokenCss = `:root {\n  --color-background-base: #0b0c0f;\n  --color-surface-card: #111827;\n  --color-text-primary: #f4f6f8;\n  --color-text-secondary: #cbd5e1;\n  --color-accent-brand: #7c5cff;\n  --color-accent-cyan: #21d4fd;\n  --radius-card: 16px;\n  --space-route: 24px;\n  font-family: Inter, system-ui, sans-serif;\n}\n`;
+  await writeFile(join(stylesDir, 'tokens.css'), tokenCss);
+
+  await writeFile(join(uiDir, 'Button.tsx'), `type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' };\n\nexport function Button({ variant = 'primary', className = '', ...props }: ButtonProps) {\n  const variantClass = variant === 'primary'\n    ? 'bg-[var(--color-accent-brand)] text-white'\n    : 'border border-slate-600 text-[var(--color-text-primary)]';\n  return <button className={[\"rounded-xl px-5 py-3 text-sm font-semibold transition hover:opacity-90\", variantClass, className].join(' ')} {...props} />;\n}\n`);
+  await writeFile(join(uiDir, 'Card.tsx'), `export function Card({ title, description }: { title: string; description: string }) {\n  return (\n    <article className="rounded-[var(--radius-card)] border border-slate-700 bg-[var(--color-surface-card)] p-6">\n      <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{title}</h3>\n      <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{description}</p>\n    </article>\n  );\n}\n`);
+  components.push({ name: 'Button', path: 'components/ui/Button.tsx' }, { name: 'Card', path: 'components/ui/Card.tsx' });
+
+  for (const route of routes) {
+    const componentName = `${pascalCase(route.name)}Route`;
+    const componentPath = `components/routes/${componentName}.tsx`;
+    const snapshotPath = `assets/snapshots/${route.path === '/' ? 'home' : route.path.replace(/^\//, '').replace(/\//g, '-')}.svg`;
+    await writeFile(join(outputDir, componentPath), routeComponentSource(route, context.projectName));
+    await writeFile(join(outputDir, snapshotPath), routeSnapshotSvg(route, context.projectName));
+    components.push({ name: componentName, path: componentPath, route: route.path });
+    assets.push({ kind: 'route_snapshot', path: snapshotPath, route: route.path });
+  }
+
+  for (const candidate of context.normalized_candidates) {
+    if (candidate.imageUrl) {
+      assets.push({ kind: 'provider_image', path: candidate.imageUrl, route: candidate.target, source_url: candidate.imageUrl });
+    }
+    if (candidate.htmlUrl) {
+      assets.push({ kind: 'provider_html', path: candidate.htmlUrl, route: candidate.target, source_url: candidate.htmlUrl });
+    }
+  }
+
+  const indexSource = [
+    "export * from './ui/Button';",
+    "export * from './ui/Card';",
+    ...routes.map((route) => `export * from './routes/${pascalCase(route.name)}Route';`),
+    '',
+  ].join('\n');
+  await writeFile(join(componentsDir, 'index.ts'), indexSource);
+
+  const routesMarkdown = [
+    '# Route design snapshots',
+    '',
+    `Project: ${context.projectName}`,
+    '',
+    'This file is the route-level handoff for the proposed Stitch-style design bundle. Each route embeds a local snapshot and links to its importable React component and shared design system.',
+    '',
+    '- [Design system](./design-system.md)',
+    '- [Component library JSON](./component-library.json)',
+    '- [React component barrel](./components/index.ts)',
+    '- [Design bundle manifest](./design-bundle.json)',
+    '',
+    ...routes.flatMap((route) => {
+      const componentName = `${pascalCase(route.name)}Route`;
+      const snapshotPath = `assets/snapshots/${route.path === '/' ? 'home' : route.path.replace(/^\//, '').replace(/\//g, '-')}.svg`;
+      return [
+        `## ${route.name} — \`${route.path}\``,
+        '',
+        `![Route snapshot: ${route.path}](./${snapshotPath})`,
+        '',
+        route.description,
+        '',
+        `- React component: [${componentName}](./components/routes/${componentName}.tsx)`,
+        '- Shared tokens: [styles/tokens.css](./styles/tokens.css)',
+        '',
+      ];
+    }),
+  ].join('\n');
+  await writeFile(join(outputDir, 'routes.md'), routesMarkdown);
+
+  const manifest = {
+    version: '1.0.0',
+    format: 'self-contained-react-design-bundle',
+    projectName: context.projectName,
+    providerMode: context.providerMode,
+    routes,
+    components,
+    assets,
+    styleGuide: 'design-system.md',
+    routesMarkdown: 'routes.md',
+    tokensCss: 'styles/tokens.css',
+    generatedAt: new Date().toISOString(),
+    stitchExtractionNote: 'Provider URLs are preserved when Stitch returns screenshot/html download URLs. Local SVG route snapshots and React components are generated as an importable fallback so the bundle remains self-contained even without browser automation.',
+  };
+  await writeFile(join(outputDir, 'design-bundle.json'), JSON.stringify(manifest, null, 2));
+
+  return {
+    bundleDir: outputDir,
+    manifestPath: join(outputDir, 'design-bundle.json'),
+    routesMarkdownPath: join(outputDir, 'routes.md'),
+    componentsIndexPath: join(outputDir, 'components', 'index.ts'),
+  };
+}
+
 async function writeComponentLibraryArtifacts(
   outputDir: string,
   context: Pick<DesignContextResult, 'projectName' | 'providerMode' | 'normalized_candidates' | 'frontendTargets' | 'providers'>,
@@ -987,8 +1163,14 @@ async function writeComponentLibraryArtifacts(
     '## Composition Patterns',
     '- HeroSection, FeatureGrid, PricingStack',
     '',
+    '## Importable Design Bundle',
+    '- Route snapshots: [routes.md](./routes.md)',
+    '- React barrel export: [components/index.ts](./components/index.ts)',
+    '- Design tokens CSS: [styles/tokens.css](./styles/tokens.css)',
+    '- Bundle manifest: [design-bundle.json](./design-bundle.json)',
+    '',
     '## Provider Notes',
-    '- Stitch candidates prioritize visual exploration and variant generation.',
+    '- Stitch candidates prioritize visual exploration, route snapshots, and importable React handoff artifacts.',
     '- Framer candidates prioritize component composition and property-control readiness.',
     '',
   ].join('\n');
@@ -1313,6 +1495,24 @@ export async function designIntake(payload: DesignIntakePayload): Promise<Design
   });
   context.component_library = { path: artifacts.componentPath, format: 'json', version: '1.0.0' };
   context.design_system = { path: artifacts.designSystemPath, format: 'markdown' };
+
+  const designBundle = await writeDesignBundleArtifacts(outputDir, {
+    projectName: context.projectName,
+    prompt: context.prompt,
+    providerMode: context.providerMode,
+    normalized_candidates: context.normalized_candidates,
+    frontendTargets: context.frontendTargets,
+    providers: context.providers,
+    urls: context.urls,
+    crawledUrls: context.crawledUrls,
+  });
+  context.design_bundle = {
+    path: designBundle.bundleDir,
+    manifest_path: designBundle.manifestPath,
+    routes_markdown_path: designBundle.routesMarkdownPath,
+    components_index_path: designBundle.componentsIndexPath,
+    format: 'self-contained-react-design-bundle',
+  };
 
   await writeFile(join(outputDir, 'design-context.json'), JSON.stringify(context, null, 2));
   return context;

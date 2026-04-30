@@ -97,6 +97,26 @@ steps:
         r['voter_%d_model'%(i+1)] = v.get('model','gemini-3.1-pro-preview')
       lin = c.get('defaults',{}).get('linear',{})
       r['linear_team_id'] = lin.get('teamId','')
+      caps = {}
+      invoke_cmd = os.environ.get('CTO_LLM_INVOKE_CMD')
+      if invoke_cmd:
+        try:
+          import subprocess
+          proc = subprocess.run(
+            invoke_cmd.split() + ['--tool','provider-capabilities','--action','json'],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+          )
+          if proc.returncode == 0 and proc.stdout.strip():
+            caps = json.loads(proc.stdout)
+          else:
+            caps = {'error':'capability_probe_failed','stderr':proc.stderr[:500]}
+        except Exception as exc:
+          caps = {'error':'capability_probe_exception','reason':str(exc)[:500]}
+      r['provider_capabilities'] = caps
       print(json.dumps(r))
       "
 
@@ -228,7 +248,8 @@ steps:
 
       REQUIRES_STITCH=false
       case "$PROVIDER_MODE" in
-        stitch|auto) REQUIRES_STITCH=true ;;
+        stitch) REQUIRES_STITCH=true ;;
+        auto) REQUIRES_STITCH=false ;;
       esac
 
       if [ "$MODE" = "ingest_plus_stitch" ]; then
@@ -237,9 +258,12 @@ steps:
 
       if [ "$REQUIRES_STITCH" = "true" ] && [ -z "${STITCH_API_KEY:-}" ]; then
         "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "stitch-credentials" "failed" "${audio_debug}" "error" "design_mode ${MODE}"
-        echo "materialize-design-inputs: STITCH_API_KEY is required for provider mode ${PROVIDER_MODE}." >&2
+        echo "materialize-design-inputs: STITCH_API_KEY is required for explicit Stitch provider mode ${PROVIDER_MODE}." >&2
         echo "credential discovery: $(cat "$AUTH_DISCOVERY_JSON")" >&2
         exit 1
+      fi
+      if [ "$PROVIDER_MODE" = "auto" ] && [ -z "${STITCH_API_KEY:-}" ]; then
+        echo "materialize-design-inputs: STITCH_API_KEY missing; provider auto will use local Stitch-style bundle generation." >&2
       fi
       "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "stitch-credentials" "passed" "${audio_debug}" "normal" "design_mode ${MODE}"
 
@@ -313,26 +337,13 @@ steps:
       "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "save-design-bundle" "${audio_debug}" "project ${project_name}"
       SRC_DIR="$WS/.intake/design"
       OUT_DIR="$WS/.tasks/design"
+      # Preserve the design bundle as a self-contained folder. This includes
+      # route markdown, embedded local snapshots, generated React components,
+      # token CSS, provider outputs, and any extracted Stitch/Framer links.
+      rm -rf "$OUT_DIR"
+      mkdir -p "$(dirname "$OUT_DIR")"
+      cp -R "$SRC_DIR" "$OUT_DIR"
       mkdir -p "$OUT_DIR/crawled" "$OUT_DIR/stitch"
-      cp "$SRC_DIR/design-context.json" "$OUT_DIR/design-context.json"
-      if [ -f "$SRC_DIR/crawled/urls.json" ]; then
-        cp "$SRC_DIR/crawled/urls.json" "$OUT_DIR/crawled/urls.json"
-      fi
-      if [ -f "$SRC_DIR/stitch/stitch-run.json" ]; then
-        cp "$SRC_DIR/stitch/stitch-run.json" "$OUT_DIR/stitch/stitch-run.json"
-      fi
-      if [ -f "$SRC_DIR/stitch/candidates.json" ]; then
-        cp "$SRC_DIR/stitch/candidates.json" "$OUT_DIR/stitch/candidates.json"
-      fi
-      if [ -f "$SRC_DIR/candidates.normalized.json" ]; then
-        cp "$SRC_DIR/candidates.normalized.json" "$OUT_DIR/candidates.normalized.json"
-      fi
-      if [ -f "$SRC_DIR/component-library.json" ]; then
-        cp "$SRC_DIR/component-library.json" "$OUT_DIR/component-library.json"
-      fi
-      if [ -f "$SRC_DIR/design-system.md" ]; then
-        cp "$SRC_DIR/design-system.md" "$OUT_DIR/design-system.md"
-      fi
       if [ -f "$SRC_DIR/auth-discovery.json" ]; then
         cp "$SRC_DIR/auth-discovery.json" "$OUT_DIR/auth-discovery.json"
       fi
@@ -367,6 +378,11 @@ steps:
             component_library: ($bundle_dir + "/component-library.json"),
             design_system: ($bundle_dir + "/design-system.md"),
             design_variants: ($bundle_dir + "/stitch/design-variants.json"),
+            design_bundle: ($bundle_dir + "/design-bundle.json"),
+            routes_markdown: ($bundle_dir + "/routes.md"),
+            components_index: ($bundle_dir + "/components/index.ts"),
+            tokens_css: ($bundle_dir + "/styles/tokens.css"),
+            route_snapshots_dir: ($bundle_dir + "/assets/snapshots"),
             design_selections: ($bundle_dir + "/selections.json"),
             source_screenshots: ($bundle_dir + "/source-screenshots.json"),
             snapshot_links_json: ($bundle_dir + "/snapshot-links.json"),
@@ -1058,10 +1074,13 @@ steps:
         "stitch_reason=" + (.stitch.reason // "")
       ] | join("; ")' "$WS/.intake/design/design-context.json" 2>/dev/null || printf '')"
       EFFECTIVE_NUM_TASKS="${num_tasks}"
-      if [ "$EFFECTIVE_NUM_TASKS" = "0" ] || [ -z "$EFFECTIVE_NUM_TASKS" ]; then
+      EFFECTIVE_NUM_TASKS_LC="$(printf '%s' "$EFFECTIVE_NUM_TASKS" | tr '[:upper:]' '[:lower:]' | xargs)"
+      if [ "$EFFECTIVE_NUM_TASKS_LC" = "auto" ] || [ "$EFFECTIVE_NUM_TASKS_LC" = "scope" ] || [ "$EFFECTIVE_NUM_TASKS_LC" = "scope-based" ] || [ "$EFFECTIVE_NUM_TASKS_LC" = "0" ] || [ -z "$EFFECTIVE_NUM_TASKS_LC" ]; then
         EFFECTIVE_NUM_TASKS="0"
-        NUM_TASKS_INSTRUCTION="as many tasks as the project scope requires (aim for thorough granularity — one task per deployable unit of work)"
+        EFFECTIVE_NUM_TASKS_MODE="auto"
+        NUM_TASKS_INSTRUCTION="as many tasks as the project scope requires (aim for thorough granularity — one task per deployable unit of work; for large platforms this is often 15-40 top-level tasks, not 3 umbrella tasks)"
       else
+        EFFECTIVE_NUM_TASKS_MODE="fixed"
         NUM_TASKS_INSTRUCTION="exactly ${EFFECTIVE_NUM_TASKS}"
       fi
       ARGS=$(jq -n \
@@ -1119,6 +1138,18 @@ steps:
       ' 2>/dev/null || printf '%s' "$OUTPUT")
       printf '%s' "$OUTPUT" > "$WS/.intake/initial-tasks.json"
       TASK_COUNT=$(printf '%s' "$OUTPUT" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)
+      AUTO_SCOPE="${EFFECTIVE_NUM_TASKS_MODE:-fixed}"
+      if [ "$AUTO_SCOPE" = "auto" ]; then
+        MIN_TASKS="${INTAKE_AUTO_MIN_TASKS:-12}"
+        PRD_BYTES="$(wc -c < "$PRD_FILE" | tr -d ' ')"
+        SIGNAL_COUNT="$(grep -Eio 'fleetaxis|mobile|extension|rental|inventory|catalog|reservation|quote|customer|admin|operator|dispatch|equipment|payment|analytics|security|integration|workflow|portal|api|service' "$PRD_FILE" | wc -l | tr -d ' ')"
+        if [ "$TASK_COUNT" -lt "$MIN_TASKS" ] && { [ "$PRD_BYTES" -gt "12000" ] || [ "$SIGNAL_COUNT" -gt "40" ]; }; then
+          echo "initial-parse-prd: FATAL — auto task decomposition returned ${TASK_COUNT} tasks for large PRD (${PRD_BYTES} bytes, ${SIGNAL_COUNT} scope signals); minimum is ${MIN_TASKS}" >&2
+          echo "initial-parse-prd: refusing to collapse a large project into tiny umbrella tasks; rerun with stronger decomposition or explicit INTAKE_FORCE_NUM_TASKS if intentional" >&2
+          "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "initial-parse-prd" "failed — task count too small for scope" "${audio_debug}" "error" "project ${project_name}" || true
+          exit 1
+        fi
+      fi
       echo "initial-parse-prd: parsed $TASK_COUNT tasks" >&2
       "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "initial-parse-prd" "parsed ${TASK_COUNT} tasks" "${audio_debug}" "normal" "project ${project_name}"
       printf '%s' "$OUTPUT"
@@ -1737,12 +1768,27 @@ steps:
       LOAD_CFG="$(printf '%s' "$CTO_LOAD_CONFIG_JSON")"
       INTAKE_MODEL_PRIMARY_PROVIDER="$(printf '%s' "$LOAD_CFG" | jq -r '.primary_provider')"
       INTAKE_MODEL_PRIMARY="$(printf '%s' "$LOAD_CFG" | jq -r '.primary_model')"
+      EFFECTIVE_NUM_TASKS="${num_tasks}"
+      if ! printf '%s' "$EFFECTIVE_NUM_TASKS" | grep -Eq '^[0-9]+$'; then
+        EFFECTIVE_NUM_TASKS="0"
+      fi
+      # A tiny explicit task count is only appropriate for structural smokes.
+      # For real/large PRDs, switch to the intake workflow's auto mode so the
+      # model decomposes by scope instead of forcing e.g. FleetAxis into 3 tasks.
+      if [ "${INTAKE_FORCE_NUM_TASKS:-false}" != "true" ] && [ "${INTAKE_FORCE_NUM_TASKS:-false}" != "1" ]; then
+        PRD_BYTES="$(wc -c < "$INTAKE_PRD" | tr -d ' ')"
+        PRD_FEATURE_SIGNALS="$(grep -Eic '(^### |^- \*\*|^-[[:space:]]|Portal|Mobile|Admin|Invoice|Order|Inventory|CRM|Warehouse|Analytics|Multi-tenant|Security|Extension|API|Integration)' "$INTAKE_PRD" 2>/dev/null || echo 0)"
+        if [ "$EFFECTIVE_NUM_TASKS" -gt 0 ] && [ "$EFFECTIVE_NUM_TASKS" -lt "12" ] && { [ "${INTAKE_AUTO_SCALE_TASKS:-true}" = "true" ] || [ "${INTAKE_AUTO_SCALE_TASKS:-true}" = "1" ]; } && { [ "$PRD_BYTES" -gt 12000 ] || [ "$PRD_FEATURE_SIGNALS" -gt 40 ]; }; then
+          echo "pipeline: num_tasks=${EFFECTIVE_NUM_TASKS} is too small for PRD scope (${PRD_BYTES} bytes, ${PRD_FEATURE_SIGNALS} feature signals); switching to auto task count" >&2
+          EFFECTIVE_NUM_TASKS="0"
+        fi
+      fi
       # Always use the primary model for task generation/refinement.
       # Fast models produce corrupted subtask arrays; fast tier is still used
       # for fan-out docs/prompts which are simpler generation tasks.
       ARGS=$(jq -n \
         --arg prd_path ".tasks/docs/prd.txt" \
-        --arg num_tasks_raw "${num_tasks}" \
+        --arg num_tasks_raw "$EFFECTIVE_NUM_TASKS" \
         --arg project_name "${project_name}" \
         --arg intake_metadata "${intake_metadata}" \
         --arg pr_base_branch "${pr_base_branch}" \
@@ -1926,6 +1972,12 @@ steps:
         jq -nc '{"synced":false,"reason":"no .tasks directory"}'
         exit 0
       fi
+      # New Sigma/CTO plan syntax: .plan is the canonical handoff root for
+      # target repos, and generated intake artifacts live under .plan/.tasks.
+      # Keep legacy .tasks/ mirrored for current consumers until they migrate.
+      mkdir -p "$root/.plan"
+      rm -rf "$root/.plan/.tasks"
+      rsync -a "$root/.tasks/" "$root/.plan/.tasks/"
       cd "$TARGET"
       git checkout main 2>/dev/null || true
       git pull --ff-only origin main 2>/dev/null || true

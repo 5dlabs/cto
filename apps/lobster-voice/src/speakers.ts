@@ -1,6 +1,12 @@
 import type { VoiceConfig } from "./voices";
 
 export type SpeakerId =
+  | "morgan"
+  | "optimus"
+  | "pessimus"
+  | "praxis"
+  | "rook"
+  | "veritas"
   | "narrator"
   | "optimist"
   | "pessimist"
@@ -23,6 +29,78 @@ export interface SpeakerConfig {
 // All speakers use ElevenLabs exclusively (eleven_flash_v2_5).
 // Each speaker has a distinct ElevenLabs voice for variety.
 const SPEAKERS: Record<SpeakerId, SpeakerConfig> = {
+  morgan: {
+    id: "morgan",
+    label: "Morgan (Chris — ElevenLabs)",
+    voice: {
+      provider: "elevenlabs",
+      voiceId: "iP95p4xoKVk53GoZ742B",   // Chris — Morgan facilitator
+      model: "eleven_turbo_v2_5",
+      stability: 0.58,
+      similarityBoost: 0.78,
+      style: 0.28,
+    },
+  },
+  optimus: {
+    id: "optimus",
+    label: "Optimus (Liam — ElevenLabs)",
+    voice: {
+      provider: "elevenlabs",
+      voiceId: "TX3LPaxmHKxFdv7VOQHJ",   // Liam — optimistic systems architect
+      model: "eleven_turbo_v2_5",
+      stability: 0.54,
+      similarityBoost: 0.78,
+      style: 0.36,
+    },
+  },
+  pessimus: {
+    id: "pessimus",
+    label: "Pessimus (Eric — ElevenLabs)",
+    voice: {
+      provider: "elevenlabs",
+      voiceId: "cjVigY5qzO86Huf0OWal",   // Eric — skeptical risk reviewer
+      model: "eleven_turbo_v2_5",
+      stability: 0.62,
+      similarityBoost: 0.76,
+      style: 0.32,
+    },
+  },
+  praxis: {
+    id: "praxis",
+    label: "Praxis (Adam — ElevenLabs)",
+    voice: {
+      provider: "elevenlabs",
+      voiceId: "pNInz6obpgDQGcFmaJgB",   // Adam — implementation pragmatist
+      model: "eleven_turbo_v2_5",
+      stability: 0.58,
+      similarityBoost: 0.76,
+      style: 0.26,
+    },
+  },
+  rook: {
+    id: "rook",
+    label: "Rook (Daniel — ElevenLabs)",
+    voice: {
+      provider: "elevenlabs",
+      voiceId: "onwK4e9ZLuTAKqWW03F9",   // Daniel — architecture/security reviewer
+      model: "eleven_turbo_v2_5",
+      stability: 0.64,
+      similarityBoost: 0.75,
+      style: 0.3,
+    },
+  },
+  veritas: {
+    id: "veritas",
+    label: "Veritas (Matilda — ElevenLabs)",
+    voice: {
+      provider: "elevenlabs",
+      voiceId: "XrExE9yKIg1WjnnlVkGX",   // Matilda — verification/operator reviewer
+      model: "eleven_turbo_v2_5",
+      stability: 0.52,
+      similarityBoost: 0.8,
+      style: 0.34,
+    },
+  },
   narrator: {
     id: "narrator",
     label: "Narrator (Rachel — ElevenLabs)",

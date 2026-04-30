@@ -14,6 +14,7 @@ Research current best practices, stable library versions, and known pitfalls bef
 
 <parameters>
   <num_tasks>{{num_tasks}}</num_tasks>
+  <task_count_policy>If this is auto/scope-based, do not compress the project into a small fixed number. Create one task per major deployable feature slice, portal, backend module, integration, data/security concern, and release-hardening concern.</task_count_policy>
   <starting_id>{{next_id}}</starting_id>
 </parameters>
 

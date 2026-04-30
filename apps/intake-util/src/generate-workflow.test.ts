@@ -90,7 +90,10 @@ const repoUrl = 'https://github.com/sigma-1/app';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function gen(tasks: GeneratedTask[], config = playConfig) {
+function gen(
+  tasks: GeneratedTask[],
+  config: Parameters<typeof generateWorkflows>[0]['config'] = playConfig,
+) {
   return generateWorkflows({
     expanded_tasks: tasks,
     scaffolds: [],

@@ -114,12 +114,15 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: PRD file missing" "${audio_debug}" "error"
         exit 1
       fi
-      # num_tasks=0 means "let the model decide based on project scope"
+      # num_tasks=0/auto means "let the model decide based on project scope"
       EFFECTIVE_NUM_TASKS="${num_tasks}"
-      if [ "$EFFECTIVE_NUM_TASKS" = "0" ] || [ -z "$EFFECTIVE_NUM_TASKS" ]; then
+      EFFECTIVE_NUM_TASKS_LC="$(printf '%s' "$EFFECTIVE_NUM_TASKS" | tr '[:upper:]' '[:lower:]' | xargs)"
+      if [ "$EFFECTIVE_NUM_TASKS_LC" = "auto" ] || [ "$EFFECTIVE_NUM_TASKS_LC" = "scope" ] || [ "$EFFECTIVE_NUM_TASKS_LC" = "scope-based" ] || [ "$EFFECTIVE_NUM_TASKS_LC" = "0" ] || [ -z "$EFFECTIVE_NUM_TASKS_LC" ]; then
         EFFECTIVE_NUM_TASKS="0"
-        NUM_TASKS_INSTRUCTION="as many tasks as the project scope requires (aim for thorough granularity — one task per deployable unit of work)"
+        EFFECTIVE_NUM_TASKS_MODE="auto"
+        NUM_TASKS_INSTRUCTION="as many tasks as the project scope requires (aim for thorough granularity — one task per deployable unit of work; for large platforms this is often 15-40 top-level tasks, not 3 umbrella tasks)"
       else
+        EFFECTIVE_NUM_TASKS_MODE="fixed"
         NUM_TASKS_INSTRUCTION="exactly ${EFFECTIVE_NUM_TASKS}"
       fi
       ARGS=$(jq -n \
@@ -142,7 +145,7 @@ steps:
       }
       FALLBACK_TASKS_FILE="$root/.intake/initial-tasks.json"
       OUTPUT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS") || {
-        if [ -s "$FALLBACK_TASKS_FILE" ] && jq -e 'type=="array" and length>0' "$FALLBACK_TASKS_FILE" >/dev/null 2>&1; then
+        if [ "${EFFECTIVE_NUM_TASKS_MODE:-fixed}" != "auto" ] && [ -s "$FALLBACK_TASKS_FILE" ] && jq -e 'type=="array" and length>0' "$FALLBACK_TASKS_FILE" >/dev/null 2>&1; then
           echo "parse-prd: LLM invoke failed; using fallback from $FALLBACK_TASKS_FILE" >&2
           cat "$FALLBACK_TASKS_FILE"
           exit 0
@@ -152,7 +155,7 @@ steps:
         exit 1
       }
       if [ -z "$OUTPUT" ] || ! printf '%s' "$OUTPUT" | jq -e 'type' >/dev/null 2>&1; then
-        if [ -s "$FALLBACK_TASKS_FILE" ] && jq -e 'type=="array" and length>0' "$FALLBACK_TASKS_FILE" >/dev/null 2>&1; then
+        if [ "${EFFECTIVE_NUM_TASKS_MODE:-fixed}" != "auto" ] && [ -s "$FALLBACK_TASKS_FILE" ] && jq -e 'type=="array" and length>0' "$FALLBACK_TASKS_FILE" >/dev/null 2>&1; then
           echo "parse-prd: invalid model output; using fallback from $FALLBACK_TASKS_FILE" >&2
           cat "$FALLBACK_TASKS_FILE"
           exit 0
@@ -177,6 +180,18 @@ steps:
         exit 1
       fi
       TASK_COUNT=$(printf '%s' "$CTO_PARSE_PRD_OUT" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)
+      if [ "${EFFECTIVE_NUM_TASKS_MODE:-fixed}" = "auto" ]; then
+        MIN_TASKS="${INTAKE_AUTO_MIN_TASKS:-12}"
+        PRD_FILE="$root/.intake/run-prd-for-intake.txt"
+        PRD_BYTES="$(wc -c < "$PRD_FILE" 2>/dev/null | tr -d ' ' || echo 0)"
+        SIGNAL_COUNT="$(grep -Eio 'fleetaxis|mobile|extension|rental|inventory|catalog|reservation|quote|customer|admin|operator|dispatch|equipment|payment|analytics|security|integration|workflow|portal|api|service' "$PRD_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+        if [ "$TASK_COUNT" -lt "$MIN_TASKS" ] && { [ "$PRD_BYTES" -gt "12000" ] || [ "$SIGNAL_COUNT" -gt "40" ]; }; then
+          echo "verify-parse-prd: FATAL — auto task decomposition returned ${TASK_COUNT} tasks for large PRD (${PRD_BYTES} bytes, ${SIGNAL_COUNT} scope signals); minimum is ${MIN_TASKS}" >&2
+          echo "verify-parse-prd: refusing to collapse a large project into tiny umbrella tasks" >&2
+          "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-parse-prd" "failed: task count too small for scope" "${audio_debug}" "error" || true
+          exit 1
+        fi
+      fi
       if [ "$TASK_COUNT" = "0" ]; then
         echo "verify-parse-prd: FATAL — parse-prd returned 0 tasks" >&2
         printf 'Output was: %.500s\n' "$CTO_PARSE_PRD_OUT" >&2
@@ -411,7 +426,23 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: zero expanded tasks" "${audio_debug}" "error"
         exit 1
       fi
-      if ! printf '%s' "$EXP" | intake-util validate --type expanded-tasks; then
+      if ! printf '%s' "$EXP" | jq -c '
+        [to_entries[] as $task |
+          ($task.value.subtasks // [] | to_entries[] | {
+            task_index: $task.key,
+            subtask_index: .key,
+            id: (.value.id // ((($task.key + 1) | tostring) + "." + ((.key + 1) | tostring))),
+            subtask_id: (.value.subtask_id // .value.id // (.key + 1)),
+            title: (.value.title // .value.description // ("Subtask " + ((.key + 1) | tostring))),
+            description: (.value.description // .value.title // ("Subtask " + ((.key + 1) | tostring))),
+            dependencies: (.value.dependencies // []),
+            value: .value
+          })] as $subs
+        | reduce $subs[] as $s (.;
+            .[$s.task_index].subtasks[$s.subtask_index] =
+              ($s.value + {id: $s.id, subtask_id: $s.subtask_id, title: $s.title, description: $s.description, dependencies: $s.dependencies})
+          )
+      ' | intake-util validate --type expanded-tasks; then
         echo "verify-refine-tasks: FATAL — expanded-tasks validation failed" >&2
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: expanded-tasks validation error" "${audio_debug}" "error"
         exit 1
@@ -1039,7 +1070,7 @@ steps:
                 + "</task>"
               ),
               subtasks: [($t.subtasks // [])[]? | select(type == "object") | {
-                subtask_id: .id,
+                subtask_id: (.subtask_id // .id // .title // "subtask"),
                 prompt_md: (
                   "<identity>\nYou are " + (($t.agent // "Unassigned") | tostring)
                   + " working on subtask " + ((.id // 0)|tostring) + " of task " + (($t.id // 0)|tostring) + ".\n</identity>\n\n"
@@ -1152,7 +1183,7 @@ steps:
                 + "</task>"
               ),
               subtasks: [($t.subtasks // [])[]? | select(type == "object") | {
-                subtask_id: .id,
+                subtask_id: (.subtask_id // .id // .title // "subtask"),
                 prompt_md: (
                   "<identity>\nYou are " + (($t.agent // "Unassigned") | tostring)
                   + " working on subtask " + ((.id // 0)|tostring) + " of task " + (($t.id // 0)|tostring) + ".\n</identity>\n\n"
@@ -1260,7 +1291,12 @@ steps:
       rm -f "$SCF_TMP"
       if [ -z "$OUTPUT" ]; then
         echo "generate-workflows: FATAL — generate-workflows returned empty output" >&2; exit 1; fi
-      printf '%s' "$OUTPUT"
+      mkdir -p "$root/.intake/step-outputs"
+      WF_OUT_FILE="$root/.intake/step-outputs/generate-workflows.json"
+      printf '%s' "$OUTPUT" > "$WF_OUT_FILE"
+      # Keep stdout intentionally tiny. Large workflow JSON can exceed OS env/argv
+      # limits when Lobster injects step stdout into the next step environment.
+      printf '%s' "$WF_OUT_FILE"
 
   - id: validate-workflows
     env:
@@ -1274,9 +1310,15 @@ steps:
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-workflows" "failed: empty workflow output" "${audio_debug}" "error"
         exit 1
       fi
+      WF_FILE="$CTO_GENERATE_WORKFLOWS_OUT"
+      if [ ! -s "$WF_FILE" ]; then
+        echo "validate-workflows: FATAL — workflow output file not found or empty: $WF_FILE" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-workflows" "failed: missing workflow output file" "${audio_debug}" "error"
+        exit 1
+      fi
       EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -cs 'map(select(type!="null")) | (.[-1] // []) | if type=="object" then (.output[0].expanded_tasks // .expanded_tasks // .tasks // []) elif type=="array" then . else [] end' 2>/dev/null || echo "[]")
       TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
-      WF_COUNT=$(printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | jq '.task_workflows | length' 2>/dev/null || echo 0)
+      WF_COUNT=$(jq '.task_workflows | length' "$WF_FILE" 2>/dev/null || echo 0)
       if [ "$WF_COUNT" = "0" ]; then
         echo "validate-workflows: FATAL — task_workflows array is empty" >&2
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-workflows" "failed: zero workflows generated" "${audio_debug}" "error"
@@ -1284,7 +1326,7 @@ steps:
       fi
       STRICT_CONTENT_GATES="${INTAKE_STRICT_CONTENT_GATES:-true}"
       WORKFLOWS_VALIDATE_STATUS=0
-      WORKFLOWS_VALIDATE_OUT="$(printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | jq '.task_workflows' | intake-util validate --type workflows --task-ids "$TASK_IDS" 2>&1)" || WORKFLOWS_VALIDATE_STATUS=$?
+      WORKFLOWS_VALIDATE_OUT="$(jq '.task_workflows' "$WF_FILE" | intake-util validate --type workflows --task-ids "$TASK_IDS" 2>&1)" || WORKFLOWS_VALIDATE_STATUS=$?
       if [ -n "$WORKFLOWS_VALIDATE_OUT" ]; then
         printf '%s\n' "$WORKFLOWS_VALIDATE_OUT" >&2
       fi
@@ -1302,7 +1344,12 @@ steps:
     command: |
       root="${WORKSPACE:-.}"
       "$root/intake/scripts/workflow-step-audio.sh" "intake" "write-workflows" "${audio_debug}"
-      printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | intake-util write-files --base-path .tasks/docs --type workflows
+      WF_FILE="$CTO_GENERATE_WORKFLOWS_OUT"
+      if [ ! -s "$WF_FILE" ]; then
+        echo "write-workflows: FATAL — workflow output file not found or empty: $WF_FILE" >&2
+        exit 1
+      fi
+      intake-util write-files --base-path .tasks/docs --type workflows < "$WF_FILE"
 
   - id: generate-scale-tasks
     env:
