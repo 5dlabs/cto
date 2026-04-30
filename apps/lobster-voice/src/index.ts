@@ -131,7 +131,16 @@ interface RenderStatus {
   outputPath?: string;
   segmentCount?: number;
   chunkCount?: number;
+  durationSeconds?: number;
+  codec?: string;
+  format?: string;
   error?: string;
+}
+
+interface AudioProbeResult {
+  durationSeconds: number;
+  codec: string;
+  format: string;
 }
 
 function nowIso(): string {
@@ -160,6 +169,38 @@ function logRender(logPath: string | undefined, message: string): void {
 function writeRenderStatus(statusPath: string | undefined, status: RenderStatus): void {
   if (!statusPath) return;
   writeJsonFile(statusPath, status);
+}
+
+function probeAudioFile(filePath: string): AudioProbeResult {
+  const raw = execFileSync(
+    "ffprobe",
+    [
+      "-v", "error",
+      "-select_streams", "a:0",
+      "-show_entries", "stream=codec_name",
+      "-show_entries", "format=duration,format_name",
+      "-of", "json",
+      filePath,
+    ],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const parsed = JSON.parse(raw) as {
+    streams?: Array<{ codec_name?: string }>;
+    format?: { duration?: string; format_name?: string };
+  };
+  const stream = parsed.streams?.[0];
+  if (!stream) {
+    throw new Error(`render-transcript: no audio stream found in ${filePath}`);
+  }
+  const durationSeconds = Number(parsed.format?.duration ?? 0);
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    throw new Error(`render-transcript: invalid audio duration for ${filePath}`);
+  }
+  return {
+    durationSeconds,
+    codec: stream.codec_name ?? "unknown",
+    format: parsed.format?.format_name ?? "unknown",
+  };
 }
 
 function normalizeTranscriptSegment(raw: unknown, index: number): TranscriptSegment {
@@ -524,6 +565,7 @@ async function cmdRenderTranscript(flags: Record<string, string>): Promise<void>
       );
     }
 
+    const audioProbe = probeAudioFile(tmpOutput);
     renameSync(tmpOutput, outputPath);
     const completeStatus: RenderStatus = {
       status: "complete",
@@ -532,9 +574,12 @@ async function cmdRenderTranscript(flags: Record<string, string>): Promise<void>
       outputPath,
       segmentCount: segments.length,
       chunkCount,
+      durationSeconds: audioProbe.durationSeconds,
+      codec: audioProbe.codec,
+      format: audioProbe.format,
     };
     writeRenderStatus(statusPath, completeStatus);
-    logRender(logPath, `render-transcript complete (${chunkCount} chunk(s))`);
+    logRender(logPath, `render-transcript complete (${chunkCount} chunk(s), ${audioProbe.durationSeconds}s)`);
   } catch (err) {
     try { unlinkSync(tmpOutput); } catch { /* ignore */ }
     const error = err instanceof Error ? err.message : String(err);
