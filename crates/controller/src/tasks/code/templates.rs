@@ -4961,7 +4961,7 @@ Be constructive and explain the "why" behind your suggestions.
     /// If the resolved value already contains `/` it is passed through as-is.
     /// Otherwise we try the explicit `cli_config.provider` prefix, and finally
     /// fall back to provider inference from well-known prefixes so bare names
-    /// like `gemini-2.5-pro` still get routed correctly.
+    /// like `gemini-3.1-pro-preview` still get routed correctly.
     fn qualify_model_for_openclaw(code_run: &CodeRun) -> String {
         // Prefer cli_config.model (the actual model) over spec.model (display name)
         let model = code_run

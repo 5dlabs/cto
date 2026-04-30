@@ -7,7 +7,7 @@ spec:
   cliConfig:
     cliType: gemini
     maxTokens: 8192
-    model: gemini-2.5-flash
+    model: gemini-3.1-pro-preview
   contextVersion: 1
   continueSession: false
   docsRepositoryUrl: https://github.com/5dlabs/cto-agents.git
@@ -15,7 +15,7 @@ spec:
   env:
     GIT_BRANCH: main
   githubApp: 5DLabs-Rex
-  model: gemini-2.5-flash
+  model: gemini-3.1-pro-preview
   openclaw:
     discordEnabled: false
     providers:

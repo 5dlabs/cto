@@ -50,11 +50,11 @@ args:
   model_primary_provider:
     default: gemini
   model_primary:
-    default: gemini-2.5-flash
+    default: gemini-3.1-pro-preview
   model_fast_provider:
     default: gemini
   model_fast:
-    default: gemini-2.5-flash
+    default: gemini-3.1-pro-preview
   model_frontier_provider:
     default: gemini
   model_frontier:
@@ -70,7 +70,7 @@ args:
   voter_3_provider:
     default: gemini
   voter_3_model:
-    default: gemini-2.5-flash
+    default: gemini-3.1-pro-preview
   skip_workspace_pr:
     default: 'false'
 
@@ -361,7 +361,10 @@ steps:
         '{tasks_file: $tasks_file, complexity_file: $complexity_file, evaluation_criteria: $evaluation_criteria, max_revisions: $max_revisions, model_primary_provider: $model_primary_provider, model_primary: $model_primary, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, linear_session_id: $linear_session_id, audio_debug: $audio_debug}')
       REFINE_LOG="$WS/.intake/task-refinement.log"
       REFINE_STDOUT_LOG="$WS/.intake/task-refinement.stdout.log"
-      if ! lobster run --mode tool "$WS/intake/workflows/task-refinement.lobster.yaml" --args-json "$ARGS" >"$REFINE_STDOUT_LOG" 2>"$REFINE_LOG"; then
+      if [ "${INTAKE_SKIP_REFINEMENT_WORKFLOW:-false}" = "true" ] || [ "${INTAKE_SKIP_REFINEMENT_WORKFLOW:-false}" = "1" ]; then
+        echo "refine-tasks: skipping task-refinement workflow (INTAKE_SKIP_REFINEMENT_WORKFLOW=$INTAKE_SKIP_REFINEMENT_WORKFLOW)" >&2
+        jq -n --slurpfile tasks "$WS/.intake/tmp/refine-tasks-input.json" '{expanded_tasks: $tasks[0], skipped: true, reason: "INTAKE_SKIP_REFINEMENT_WORKFLOW"}' > "$REFINE_STDOUT_LOG"
+      elif ! lobster run --mode tool "$WS/intake/workflows/task-refinement.lobster.yaml" --args-json "$ARGS" >"$REFINE_STDOUT_LOG" 2>"$REFINE_LOG"; then
         echo "refine-tasks: FATAL — task-refinement workflow failed. Fix the expansion model or prompt and rerun." >&2
         echo "--- task-refinement stderr ---" >&2
         tail -80 "$REFINE_LOG" >&2
@@ -1749,8 +1752,8 @@ steps:
       printf '%s' "$CTO_INVENTORY_SKILLS" > "$SKILLS_FILE"
       python3 "$root/intake/scripts/compute-gaps.py" \
         --capabilities "$CAPS_FILE" \
-        --tools "$TOOLS_FILE" \
-        --skills "$SKILLS_FILE" \
+        --inventory-tools "$TOOLS_FILE" \
+        --inventory-skills "$SKILLS_FILE" \
         --registry "$REGISTRY"
 
   - id: query-tools-catalog

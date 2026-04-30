@@ -233,8 +233,8 @@ impl OpenClawConfig {
                     api: Some("google-generative-ai".to_string()),
                     models: vec![
                         OpenClawModelEntry {
-                            name: "gemini-2.5-flash".to_string(),
-                            display_name: Some("Gemini 2.5 Flash".to_string()),
+                            name: "gemini-3-pro-preview".to_string(),
+                            display_name: Some("Gemini 3 Pro Preview".to_string()),
                             thinking_level: None,
                             reasoning: Some(true),
                             input: Some(vec!["text".to_string(), "image".to_string()]),
@@ -242,8 +242,8 @@ impl OpenClawConfig {
                             max_tokens: Some(65_536),
                         },
                         OpenClawModelEntry {
-                            name: "gemini-2.5-pro".to_string(),
-                            display_name: Some("Gemini 2.5 Pro".to_string()),
+                            name: "gemini-3.1-pro-preview".to_string(),
+                            display_name: Some("Gemini 3.1 Pro Preview".to_string()),
                             thinking_level: None,
                             reasoning: Some(true),
                             input: Some(vec!["text".to_string(), "image".to_string()]),

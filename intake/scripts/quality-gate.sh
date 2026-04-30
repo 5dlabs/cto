@@ -35,7 +35,7 @@ fi
 if [ -z "$PROVIDER" ] || [ -z "$MODEL" ]; then
   CFG="$ROOT/cto-config.json"
   PROVIDER="${PROVIDER:-$(jq -r '.defaults.intake.models.tiers.fast.provider // "gemini"' "$CFG" 2>/dev/null || echo gemini)}"
-  MODEL="${MODEL:-$(jq -r '.defaults.intake.models.tiers.fast.model // "gemini-2.5-flash"' "$CFG" 2>/dev/null || echo gemini-2.5-flash)}"
+  MODEL="${MODEL:-$(jq -r '.defaults.intake.models.tiers.fast.model // "gemini-3.1-pro-preview"' "$CFG" 2>/dev/null || echo gemini-3.1-pro-preview)}"
 fi
 
 TMP_INPUT="$(mktemp "${TMPDIR:-/tmp}/intake-quality-input.XXXXXX.json")"

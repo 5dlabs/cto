@@ -68,7 +68,7 @@ telemetry:
 agent:
   id: "morgan"
   name: "Morgan"
-  model: "google/gemini-2.5-flash"
+  model: "google/gemini-3.1-pro-preview"
   heartbeat:
     every: "12h"
     target: "last"
@@ -113,9 +113,9 @@ agentDefaults:
       else. Do not start background work or new tasks on your own.
 
 modelDefaults:
-  primary: "google/gemini-2.5-flash"
+  primary: "google/gemini-3.1-pro-preview"
   fallbacks:
-    - "google/gemini-2.5-pro"
+    - "google/gemini-3-pro-preview"
     - "anthropic/claude-sonnet-4-20250514"
 
 # =============================================================================
@@ -156,10 +156,10 @@ models:
       baseUrl: "https://generativelanguage.googleapis.com/v1beta"
       apiKeySecretKey: "gemini-api-key"
       models:
-        - id: "gemini-2.5-flash"
-          name: "Gemini 2.5 Flash"
-        - id: "gemini-2.5-pro"
-          name: "Gemini 2.5 Pro"
+        - id: "gemini-3.1-pro-preview"
+          name: "Gemini 3.1 Pro Preview"
+        - id: "gemini-3-pro-preview"
+          name: "Gemini 3 Pro Preview"
     openai:
       # Disabled: this environment has no working OpenAI API key.
       enabled: false

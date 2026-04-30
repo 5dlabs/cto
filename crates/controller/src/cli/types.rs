@@ -322,7 +322,7 @@ mod tests {
             Some(Provider::Fireworks)
         );
         assert_eq!(
-            Provider::infer_from_model("gemini-2.5-flash"),
+            Provider::infer_from_model("gemini-3.1-pro-preview"),
             Some(Provider::Google)
         );
         assert_eq!(

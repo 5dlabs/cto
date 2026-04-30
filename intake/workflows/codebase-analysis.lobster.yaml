@@ -17,7 +17,7 @@ args:
   model_primary_provider:
     default: gemini
   model_primary:
-    default: gemini-2.5-flash
+    default: gemini-3.1-pro-preview
 
 steps:
   - id: pack-repo

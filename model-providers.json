@@ -185,13 +185,13 @@
       "score": 89,
       "tier": "standard"
     },
-    "gemini-3-flash-preview": {
+    "gemini-3-pro-preview": {
       "enabled": true,
-      "displayName": "Gemini 3 Flash",
+      "displayName": "Gemini 3 Pro Preview",
       "provider": "Google",
-      "thinkingLevel": "low",
-      "score": 83,
-      "tier": "fast"
+      "thinkingLevel": "medium",
+      "score": 87,
+      "tier": "standard"
     },
     "glm-5": {
       "enabled": true,
@@ -274,7 +274,7 @@
         "claude-sonnet-4-6",
         "claude-haiku-4-5-20251001",
         "gemini-3.1-pro-preview",
-        "gemini-3-flash-preview",
+        "gemini-3-pro-preview",
         "glm-5",
         "glm-4.7",
         "kimi-k2.5",

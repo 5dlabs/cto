@@ -110,7 +110,7 @@ spec:
           thinkingDefault: "low"
           typingMode: "instant"
           compaction:
-            model: "google/gemini-2.5-flash"
+            model: "google/gemini-3.1-pro-preview"
             notifyUser: true
           contextPruning:
             mode: "cache-ttl"
@@ -127,7 +127,7 @@ spec:
           fallbacks:
             - "openai-api/gpt-5.4"
             - "fireworks/accounts/fireworks/models/kimi-k2p6"
-            - "google/gemini-2.5-pro"
+            - "google/gemini-3.1-pro-preview"
 
         models:
           providers:
@@ -180,8 +180,8 @@ spec:
               auth: "api-key"
               authHeader: true
               models:
-                - id: "gemini-2.5-pro"
-                  name: "Gemini 2.5 Pro"
+                - id: "gemini-3.1-pro-preview"
+                  name: "Gemini 3.1 Pro Preview"
                   contextWindow: 1048576
                   maxTokens: 65536
                   reasoning: true
