@@ -425,7 +425,8 @@ steps:
         "$TRANSCRIPT_PATH" \
         "$root/.tasks/audio/design-deliberation.mp3" \
         "$root/.intake/audio/design-deliberation.status.json" \
-        "$root/.intake/audio/design-deliberation.log" || true
+        "$root/.intake/audio/design-deliberation.log" \
+        "$root/.intake/audio/design-deliberation.validation.json" || true
 
   - id: linear-activity-design-complete
     env:

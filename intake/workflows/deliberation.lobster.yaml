@@ -665,7 +665,8 @@ steps:
         "$TRANSCRIPT_PATH" \
         "$root/.tasks/audio/architecture-deliberation.mp3" \
         "$root/.intake/audio/architecture-deliberation.status.json" \
-        "$root/.intake/audio/architecture-deliberation.log" || true
+        "$root/.intake/audio/architecture-deliberation.log" \
+        "$root/.intake/audio/architecture-deliberation.validation.json" || true
 
   - id: notify-complete
     env:
