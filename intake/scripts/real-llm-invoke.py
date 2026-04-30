@@ -172,9 +172,7 @@ def call_gemini(model: str, system: str, user: str, action: str) -> str:
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         raise RuntimeError("GEMINI_API_KEY/GOOGLE_API_KEY missing")
-    wire_model = model or "gemini-2.5-pro"
-    if wire_model.startswith("gemini-3"):
-        wire_model = os.environ.get("GEMINI_MODEL", "gemini-2.5-pro")
+    wire_model = model or os.environ.get("GEMINI_MODEL", "gemini-3.1-pro-preview")
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": user + ("\n\nReturn valid JSON only." if action == "json" else "")}]}],

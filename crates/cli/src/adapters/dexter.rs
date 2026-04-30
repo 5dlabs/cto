@@ -328,7 +328,7 @@ mod tests {
             .await
             .unwrap());
         assert!(adapter.validate_model("gpt-4").await.unwrap());
-        assert!(adapter.validate_model("gemini-2.5-pro").await.unwrap());
+        assert!(adapter.validate_model("gemini-3.1-pro-preview").await.unwrap());
         assert!(!adapter.validate_model("llama-3").await.unwrap());
     }
 

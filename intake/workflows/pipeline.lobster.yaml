@@ -91,10 +91,10 @@ steps:
       for k in ['primary','fast','frontier']:
         d = t.get(k,{})
         r[k+'_provider'] = d.get('provider','gemini')
-        r[k+'_model'] = d.get('model','gemini-2.5-flash')
+        r[k+'_model'] = d.get('model','gemini-3.1-pro-preview')
       for i,v in enumerate(cm):
         r['voter_%d_provider'%(i+1)] = v.get('provider','gemini')
-        r['voter_%d_model'%(i+1)] = v.get('model','gemini-2.5-flash')
+        r['voter_%d_model'%(i+1)] = v.get('model','gemini-3.1-pro-preview')
       lin = c.get('defaults',{}).get('linear',{})
       r['linear_team_id'] = lin.get('teamId','')
       print(json.dumps(r))

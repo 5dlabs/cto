@@ -412,7 +412,7 @@ mod tests {
             .validate_model("gemini-3-pro-preview")
             .await
             .unwrap());
-        assert!(adapter.validate_model("gemini-2.5-flash").await.unwrap());
+        assert!(adapter.validate_model("gemini-3.1-pro-preview").await.unwrap());
         assert!(adapter
             .validate_model("models/gemini-3-pro-preview")
             .await

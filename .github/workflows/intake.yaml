@@ -261,7 +261,7 @@ jobs:
               --slurpfile skills .intake/step-outputs/inventory-skills.json \
               --arg schema intake/schemas/capability-analysis.schema.json \
               --arg provider gemini \
-              --arg model gemini-2.5-flash \
+              --arg model gemini-3.1-pro-preview \
               '{ prompt: $sys,
                  input: { expanded_tasks: [], current_inventory: { available_tools: $tools[0], available_skills: $skills[0] } },
                  schema: $schema, provider: $provider, model: $model }')

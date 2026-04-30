@@ -50,11 +50,11 @@ args:
   model_primary_provider:
     default: gemini
   model_primary:
-    default: gemini-2.5-flash
+    default: gemini-3.1-pro-preview
   model_fast_provider:
     default: gemini
   model_fast:
-    default: gemini-2.5-flash
+    default: gemini-3.1-pro-preview
   model_frontier_provider:
     default: gemini
   model_frontier:
@@ -70,7 +70,7 @@ args:
   voter_3_provider:
     default: gemini
   voter_3_model:
-    default: gemini-2.5-flash
+    default: gemini-3.1-pro-preview
   skip_workspace_pr:
     default: 'false'
 

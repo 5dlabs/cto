@@ -627,7 +627,7 @@ mod tests {
         let gemini_config = AgentConfig {
             github_app: "test".to_string(),
             cli: "code".to_string(),
-            model: "gemini-2.5-pro".to_string(),
+            model: "gemini-3.1-pro-preview".to_string(),
             max_tokens: None,
             temperature: None,
             tools: None,

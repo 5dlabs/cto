@@ -631,7 +631,7 @@ fn get_model_for_cli(cli_type: CLIType) -> String {
         CLIType::Codex => "o4-mini".to_string(),
         CLIType::Cursor => "claude-sonnet-4-20250514".to_string(),
         CLIType::Factory => "claude-sonnet-4-20250514".to_string(),
-        CLIType::Gemini => "gemini-2.5-pro".to_string(),
+        CLIType::Gemini => "gemini-3.1-pro-preview".to_string(),
         CLIType::OpenCode => "claude-sonnet-4-20250514".to_string(),
         _ => "test-model".to_string(),
     }

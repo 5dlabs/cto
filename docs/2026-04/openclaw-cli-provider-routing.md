@@ -18,7 +18,7 @@ container starts.
 | `codex` | `/usr/local/bin/codex` | `/workspace/.codex/config.toml` | `gpt-5.3-codex` | OpenAI | `openai-api-key` ¹ | — (intentionally unset) ² |
 | `copilot` | gh extension / standalone | `/workspace/.copilot/config.json` | Claude Opus 4.6 | GitHub Copilot | `github-pat` | `COPILOT_GITHUB_TOKEN` + `GH_TOKEN` |
 | `cursor` | cursor agent | `/workspace/.cursor/mcp.json` | `opus-4.7` | Cursor | — (OAuth flow) ³ | — |
-| `gemini` | gemini CLI | `/workspace/.gemini/settings.json` | `gemini-2.5-pro` | Google | `gemini-api-key` | `GEMINI_API_KEY` + `GOOGLE_API_KEY` |
+| `gemini` | gemini CLI | `/workspace/.gemini/settings.json` | `gemini-3.1-pro-preview` | Google | `gemini-api-key` | `GEMINI_API_KEY` + `GOOGLE_API_KEY` |
 | `opencode` | opencode CLI | `/workspace/opencode.json` | `fireworks/kimi-k2-turbo` | Fireworks | `fireworks-api-key` | `FIREWORKS_API_KEY` |
 | `factory` / `droid` | `/usr/local/bin/droid` | `/workspace/.factory/mcp.json` | `glm-4-plus` | ZhipuAI | `factory-api-key` | `FACTORY_API_KEY` |
 | `dexter` | dexter CLI | — | `claude-opus-4-7-20260610` | Anthropic | `anthropic-api-key` | `ANTHROPIC_API_KEY` |

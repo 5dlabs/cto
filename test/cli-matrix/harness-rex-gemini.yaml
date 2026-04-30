@@ -14,14 +14,14 @@ spec:
   docsBranch: main
   workingDirectory: .
   githubApp: 5DLabs-Nova
-  model: gemini-2.5-flash
+  model: gemini-3.1-pro-preview
   contextVersion: 1
   taskId: 1
   enableDocker: false
   cliConfig:
     cliType: gemini
     provider: google
-    model: gemini-2.5-flash
+    model: gemini-3.1-pro-preview
     settings:
       listToolsOnStart: true
   promptModification: |

@@ -18,8 +18,8 @@ Multi-CLI E2E test suite for the CTO controller pipeline.
 | Codex | OpenAI | codex-mini-latest | no |
 | OpenCode | Fireworks | qwen3-235b-a22b | no |
 | Factory | ZhipuAI | qwen3-235b-a22b | no |
-| Cursor | Google | gemini-2.5-flash | no |
-| Gemini | Google | gemini-2.5-flash | no |
+| Cursor | Google | gemini-3.1-pro-preview | no |
+| Gemini | Google | gemini-3.1-pro-preview | no |
 | Copilot | Anthropic | claude-sonnet-4-6 | no |
 | Kimi | Moonshot | kimi-k2p5-turbo | no |
 

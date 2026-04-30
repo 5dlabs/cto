@@ -44,13 +44,13 @@ args = {
     "evaluation_criteria": "task decomposition quality, dependency ordering, decision point coverage",
     "max_revisions": "2",
     "model_primary_provider": tiers.get("primary", {}).get("provider", "gemini"),
-    "model_primary": tiers.get("primary", {}).get("model", "gemini-2.5-flash"),
+    "model_primary": tiers.get("primary", {}).get("model", "gemini-3.1-pro-preview"),
     "voter_1_provider": committee_value(0, "provider", "gemini"),
-    "voter_1_model": committee_value(0, "model", "gemini-2.5-flash"),
+    "voter_1_model": committee_value(0, "model", "gemini-3.1-pro-preview"),
     "voter_2_provider": committee_value(1, "provider", "gemini"),
-    "voter_2_model": committee_value(1, "model", "gemini-2.5-flash"),
+    "voter_2_model": committee_value(1, "model", "gemini-3.1-pro-preview"),
     "voter_3_provider": committee_value(2, "provider", "gemini"),
-    "voter_3_model": committee_value(2, "model", "gemini-2.5-flash"),
+    "voter_3_model": committee_value(2, "model", "gemini-3.1-pro-preview"),
     "audio_debug": "false",
 }
 print(json.dumps(args))
