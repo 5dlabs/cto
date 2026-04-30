@@ -75,6 +75,10 @@ spec:
               cp /config-template/SOUL.md /opt/data/SOUL.md
               cp /config-template/AGENTS.md /opt/data/workspace/AGENTS.md
               cp /config-template/TOOLS.md /opt/data/workspace/TOOLS.md
+              if [ -r /patches/patch-discord-sethome.py ]; then
+                python3 /patches/patch-discord-sethome.py
+                python3 -m py_compile /opt/hermes/gateway/platforms/discord.py
+              fi
               cat > /opt/data/home/bin/git-credential-github-token <<'EOF'
               #!/bin/sh
               [ "${1:-get}" = "get" ] || exit 0
@@ -141,6 +145,8 @@ spec:
               mountPath: /opt/data
             - name: config-template
               mountPath: /config-template
+            - name: patches
+              mountPath: /patches
           env:
             - name: CODEX_AUTH_SUB1
               valueFrom:
@@ -195,14 +201,16 @@ spec:
           image: docker.io/nousresearch/hermes-agent:v2026.4.23
           imagePullPolicy: IfNotPresent
           command:
-            - /opt/hermes/docker/entrypoint.sh
+            - sh
+            - -c
           args:
-            - hermes
-            - --yolo
-            - --accept-hooks
-            - gateway
-            - run
-            - --accept-hooks
+            - |
+              set -eu
+              if [ -r /patches/patch-discord-sethome.py ]; then
+                python3 /patches/patch-discord-sethome.py
+                python3 -m py_compile /opt/hermes/gateway/platforms/discord.py
+              fi
+              exec /opt/hermes/docker/entrypoint.sh hermes --yolo --accept-hooks gateway run --accept-hooks
           workingDir: /opt/data/workspace
           env:
             - name: HOME
@@ -325,6 +333,9 @@ spec:
             - name: github-token
               mountPath: /var/run/secrets/hermes-github
               readOnly: true
+            - name: patches
+              mountPath: /patches
+              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -332,6 +343,10 @@ spec:
         - name: config-template
           configMap:
             name: cto-hermes-coder-control-config
+        - name: patches
+          configMap:
+            name: cto-hermes-coder-control-patches
+            defaultMode: 0555
         - name: github-token
           secret:
             secretName: cto-coder-api-keys
