@@ -141,14 +141,14 @@ steps:
         exit 1
       }
       FALLBACK_TASKS_FILE="$root/.intake/initial-tasks.json"
-      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
+      OUTPUT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS") || {
         if [ -s "$FALLBACK_TASKS_FILE" ] && jq -e 'type=="array" and length>0' "$FALLBACK_TASKS_FILE" >/dev/null 2>&1; then
-          echo "parse-prd: openclaw.invoke failed; using fallback from $FALLBACK_TASKS_FILE" >&2
+          echo "parse-prd: LLM invoke failed; using fallback from $FALLBACK_TASKS_FILE" >&2
           cat "$FALLBACK_TASKS_FILE"
           exit 0
         fi
-        echo "parse-prd: FATAL — openclaw.invoke failed after retries and no fallback tasks available" >&2
-        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: openclaw.invoke error" "${audio_debug}" "error"
+        echo "parse-prd: FATAL — LLM invoke failed after retries and no fallback tasks available" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: LLM invoke error" "${audio_debug}" "error"
         exit 1
       }
       if [ -z "$OUTPUT" ] || ! printf '%s' "$OUTPUT" | jq -e 'type' >/dev/null 2>&1; then
@@ -157,7 +157,7 @@ steps:
           cat "$FALLBACK_TASKS_FILE"
           exit 0
         fi
-        echo "parse-prd: FATAL — openclaw.invoke returned empty/invalid JSON and no fallback tasks available" >&2
+        echo "parse-prd: FATAL — LLM invoke returned empty/invalid JSON and no fallback tasks available" >&2
         printf '%s\n' "$OUTPUT" >&2
         "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: empty or invalid output" "${audio_debug}" "error"
         exit 1
@@ -246,7 +246,7 @@ steps:
            "input": { "tasks": $tasks[0] },
            "schema": $schema, "provider": $provider, "model": $model }') || {
         echo "analyze-complexity: FATAL — jq args build failed" >&2; exit 1; }
-      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
+      OUTPUT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS") || {
         echo "analyze-complexity: model failed; using deterministic fallback complexity" >&2
         printf '%s' '{"overall_complexity":"medium","risk_areas":["LLM provider reliability"],"critical_path":[1],"notes":"Fallback complexity due model outage."}'
         exit 0; }
@@ -505,7 +505,7 @@ steps:
            "input": { "expanded_tasks": $expanded_tasks[0], "codebase_context": $codebase, "infrastructure_context": $infra },
            "schema": $schema, "provider": $provider, "model": $model }') || {
         echo "generate-scaffolds: FATAL — jq args build failed" >&2; exit 1; }
-      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
+      OUTPUT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS") || {
         echo "generate-scaffolds: model failed; building deterministic fallback scaffolds" >&2
         printf '%s' "$EXP" | jq '{scaffolds:[.[] | {task_id:.id}]}' && exit 0; }
       if [ -z "$OUTPUT" ]; then
@@ -893,7 +893,7 @@ steps:
         '{ "prompt": $sys,
            "input": { "expanded_tasks": $expanded_tasks[0], "skill_search_results": $skill_search_results[0] },
            "schema": $schema, "provider": $provider, "model": $model }')
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS"
 
   - id: verify-discover-skills
     env:
@@ -937,7 +937,7 @@ steps:
         '{ "prompt": $sys,
            "input": { "expanded_tasks": $expanded_tasks[0], "available_tools": $available_tools, "infrastructure_context": $infrastructure_context },
            "schema": $schema, "provider": $provider, "model": $model }')
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS"
 
   - id: fan-out-prompts
     env:
@@ -1324,7 +1324,7 @@ steps:
         '{ "prompt": $sys,
            "input": { "expanded_tasks": $expanded_tasks[0], "infrastructure_context": $infrastructure_context },
            "schema": $schema, "provider": $provider, "model": $model }')
-      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")
+      OUTPUT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS")
       mkdir -p "$root/.intake/step-outputs"
       printf '%s' "$OUTPUT" > "$root/.intake/step-outputs/generate-scale-tasks.json"
       printf '%s' "$OUTPUT"
@@ -1358,7 +1358,7 @@ steps:
         '{ "prompt": $sys,
            "input": { "expanded_tasks": $expanded_tasks[0], "scale_tasks": $scale_tasks[0] },
            "schema": $schema, "provider": $provider, "model": $model }')
-      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")
+      OUTPUT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS")
       mkdir -p "$root/.intake/step-outputs"
       printf '%s' "$OUTPUT" > "$root/.intake/step-outputs/generate-security-report.json"
       printf '%s' "$OUTPUT"
@@ -1403,7 +1403,7 @@ steps:
         '{ "prompt": $sys,
            "input": { "security_report": $security_report[0], "expanded_tasks": $expanded_tasks[0] },
            "schema": $schema, "provider": $provider, "model": $model }')
-      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")
+      OUTPUT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS")
       mkdir -p "$root/.intake/step-outputs"
       printf '%s' "$OUTPUT" > "$root/.intake/step-outputs/generate-remediation-tasks.json"
       printf '%s' "$OUTPUT"
@@ -1729,7 +1729,7 @@ steps:
         '{ "prompt": $sys,
            "input": { "expanded_tasks": $expanded_tasks[0], "current_inventory": $inventory[0] },
            "schema": $schema, "provider": $provider, "model": $model }')
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS"
 
   - id: compute-capability-gaps
     env:
@@ -1809,7 +1809,7 @@ steps:
         '{ "prompt": $sys,
            "input": { "unresolved_capabilities": $capabilities[0], "current_inventory": $inventory[0], "context7_snippets": $ctx7_context },
            "schema": $schema, "provider": $provider, "model": $model }')
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS"
 
   - id: search-and-resolve-gaps
     env:
@@ -1887,7 +1887,7 @@ steps:
               '{ "prompt": $sys,
                  "input": { "capability": $capability, "search_results": $results[0] },
                  "schema": $schema, "provider": $provider, "model": $model }')
-            VET_OUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$VET_ARGS" 2>/dev/null || echo '{}')
+            VET_OUT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$VET_ARGS" 2>/dev/null || echo '{}')
             VET_TOOLS=$(printf '%s' "$VET_OUT" | jq -c '.resolved_tools // []' 2>/dev/null || echo '[]')
             ALL_RESOLVED_TOOLS=$(jq -n --argjson existing "$ALL_RESOLVED_TOOLS" --argjson new "$VET_TOOLS" '$existing + $new')
           fi
@@ -1990,7 +1990,7 @@ steps:
         '{ "prompt": $sys,
            "input": { "unresolved_capabilities": $unresolved[0], "context7_documentation": $ctx7_docs },
            "schema": $schema, "provider": $provider, "model": $model }')
-      RESULT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")
+      RESULT=$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS")
 
       # Write generated SKILL.md files to agent-package
       GENERATED=$(printf '%s' "$RESULT" | jq -c '.generated_skills // []')

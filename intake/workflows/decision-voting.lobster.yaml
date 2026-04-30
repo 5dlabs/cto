@@ -79,7 +79,7 @@ steps:
           "provider": $provider,
           "model": $model
         }')
-      VOTE_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")"
+      VOTE_OUT="$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS")"
       LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
       VOTE_SAY="$(printf '%s' "$VOTE_OUT" | jq -r '(.output[0] // .) | "I vote for " + (.chosen_option // .chosenOption // "undecided") + ". " + (.reasoning // .rationale // "")' 2>/dev/null || true)"
       [ -n "$LV_BIN" ] && [ -n "$VOTE_SAY" ] && WORKSPACE="$root" "$LV_BIN" debate voter-1 "$VOTE_SAY" --summarize || true
@@ -113,7 +113,7 @@ steps:
           "provider": $provider,
           "model": $model
         }')
-      VOTE_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")"
+      VOTE_OUT="$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS")"
       LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
       VOTE_SAY="$(printf '%s' "$VOTE_OUT" | jq -r '(.output[0] // .) | "I vote for " + (.chosen_option // .chosenOption // "undecided") + ". " + (.reasoning // .rationale // "")' 2>/dev/null || true)"
       [ -n "$LV_BIN" ] && [ -n "$VOTE_SAY" ] && WORKSPACE="$root" "$LV_BIN" debate voter-2 "$VOTE_SAY" --summarize || true
@@ -147,7 +147,7 @@ steps:
           "provider": $provider,
           "model": $model
         }')
-      VOTE_OUT="$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS")"
+      VOTE_OUT="$("$root/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS")"
       LV_BIN=""; command -v lobster-voice >/dev/null 2>&1 && LV_BIN="lobster-voice" || { [ -x "$root/apps/lobster-voice/lobster-voice" ] && LV_BIN="$root/apps/lobster-voice/lobster-voice"; }
       VOTE_SAY="$(printf '%s' "$VOTE_OUT" | jq -r '(.output[0] // .) | "I vote for " + (.chosen_option // .chosenOption // "undecided") + ". " + (.reasoning // .rationale // "")' 2>/dev/null || true)"
       [ -n "$LV_BIN" ] && [ -n "$VOTE_SAY" ] && WORKSPACE="$root" "$LV_BIN" debate voter-3 "$VOTE_SAY" --summarize || true

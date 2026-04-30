@@ -41,7 +41,7 @@ timeout_sec = int(sys.argv[2])
 
 try:
     completed = subprocess.run(
-        ["openclaw.invoke", "--tool", "llm-task", "--action", "json", "--args-file", args_file],
+        ["bash", "-lc", 'exec "${WORKSPACE:-.}/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-file "$1"', "_", args_file],
         check=True,
         text=True,
         capture_output=True,

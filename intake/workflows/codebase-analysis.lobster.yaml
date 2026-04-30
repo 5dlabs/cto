@@ -83,7 +83,7 @@ steps:
           "model": $model,
           "temperature": 0.2
         }' > "$ARGS_FILE";
-      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action text --args-file "$ARGS_FILE"
+      "$root/intake/scripts/llm-invoke.sh" --tool llm-task --action text --args-file "$ARGS_FILE"
 
   - id: save-context
     env:

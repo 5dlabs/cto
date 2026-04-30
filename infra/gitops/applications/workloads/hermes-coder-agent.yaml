@@ -2,10 +2,7 @@
 # =============================================================================
 # Hermes Coder Agent — ArgoCD Application
 # =============================================================================
-# Deploys a persistent Hermes harness debug bot in the cto namespace.
-# The pod runs `sleep infinity` and ships the raw Handlebars-templated
-# Hermes harness script at /etc/hermes/container.sh.hbs so a human can
-# `kubectl exec` in and render/run it manually.
+# Deploys the persistent Hermes Coder agent in the cto namespace.
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -28,7 +25,7 @@ spec:
       targetRevision: main
       path: infra/charts/hermes-agent
       helm:
-        releaseName: cto-hermes-coder
+        releaseName: hermes-coder
         valueFiles:
           - ../../gitops/agents/hermes-coder-values.yaml
 
