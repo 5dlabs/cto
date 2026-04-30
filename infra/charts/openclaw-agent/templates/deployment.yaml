@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "openclaw-agent.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   {{- if $statefulset }}
   serviceName: {{ include "openclaw-agent.fullname" . }}
   podManagementPolicy: OrderedReady
@@ -542,12 +542,14 @@ spec:
                 echo "=== Init complete for {{ .Values.agent.id }} — all clean ==="
               fi
           env:
+            {{- if $discordConfig.enabled }}
             # Discord token
             - name: DISCORD_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.discordTokensSecret }}
                   key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
+            {{- end }}
             # Provider API keys used when init renders openclaw.json via envsubst.
             {{- range $name, $provider := .Values.models.providers }}
             {{- if and (or (not (hasKey $provider "enabled")) $provider.enabled) $provider.apiKeySecretKey }}
@@ -821,12 +823,14 @@ spec:
             - name: OPENCLAW_DEFAULT_RECIPIENT
               value: {{ .Values.agent.defaultRecipient | quote }}
             {{- end }}
+            {{- if $discordConfig.enabled }}
             - name: DISCORD_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.discordTokensSecret }}
                   key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
                   optional: true
+            {{- end }}
             # Provider API keys (available at runtime for dynamic use)
             - name: ANTHROPIC_API_KEY
               valueFrom:

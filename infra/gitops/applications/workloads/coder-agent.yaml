@@ -2,9 +2,8 @@
 # =============================================================================
 # Coder Agent — ArgoCD Application
 # =============================================================================
-# Deploys the Coder agent as a standalone deployment in the cto namespace.
-# General-purpose coding agent focused on e2e testing of intake, work, play,
-# and lobster workflows. Uses Claude Code as primary CLI with agent teams.
+# Keeps the legacy OpenClaw Coder control-plane definition dormant. The
+# production Coder Discord bot is owned by the cto-hermes-gateway Application.
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
