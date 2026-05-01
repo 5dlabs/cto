@@ -36,7 +36,9 @@ OUT=$(env -i PATH="$PATH" WORKSPACE="$ROOT" LLM_BACKEND_MARKER="$MARKER" CTO_LLM
 printf '%s' "$OUT" | grep -q '"backend":"explicit"' || fail "explicit output returned"
 pass "explicit CTO_LLM_INVOKE_CMD remains highest priority"
 
-# ACP backend can be forced and routes to repo adapter.
+# ACP backend can be forced and routes to repo adapter. WORKSPACE may point at
+# the broader persistent workspace, so llm-invoke must locate repo-local scripts
+# from its own path, not from WORKSPACE.
 ACP_STUB="$ROOT/intake/scripts/acpx-llm-task.py"
 BACKUP=""
 if [ -e "$ACP_STUB" ]; then
@@ -55,10 +57,10 @@ restore_stub() {
 trap 'restore_stub; rm -rf "$TMPDIR"' EXIT
 
 MARKER="$TMPDIR/marker-acp-forced"
-OUT=$(env -i PATH="$FAKEBIN:$PATH" WORKSPACE="$ROOT" LLM_BACKEND_MARKER="$MARKER" CTO_LLM_INVOKE_BACKEND=acp "$SCRIPT" --tool provider-capabilities --action json)
-[ "$(cat "$MARKER")" = "acp" ] || fail "forced acp backend is used"
+OUT=$(env -i PATH="$FAKEBIN:$PATH" WORKSPACE="$(dirname "$ROOT")" LLM_BACKEND_MARKER="$MARKER" CTO_LLM_INVOKE_BACKEND=acp "$SCRIPT" --tool provider-capabilities --action json)
+[ "$(cat "$MARKER")" = "acp" ] || fail "forced acp backend is used when WORKSPACE is the parent workspace"
 printf '%s' "$OUT" | grep -q '"backend":"acp"' || fail "forced acp output returned"
-pass "CTO_LLM_INVOKE_BACKEND=acp uses acpx llm-task adapter"
+pass "CTO_LLM_INVOKE_BACKEND=acp uses repo-local adapter independent of WORKSPACE"
 
 # Auto prefers ACP when acpx exists.
 MARKER="$TMPDIR/marker-auto"

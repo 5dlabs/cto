@@ -7,10 +7,11 @@
 # adapter without changing workflow YAML.
 set -euo pipefail
 
-ROOT="${WORKSPACE:-$(cd "$(dirname "$0")/../.." && pwd)}"
+SCRIPT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$SCRIPT_ROOT"
 BACKEND="${CTO_LLM_INVOKE_BACKEND:-auto}"
-ACPX_ADAPTER="$ROOT/intake/scripts/acpx-llm-task.py"
-DIRECT_ADAPTER="$ROOT/intake/scripts/real-llm-invoke.py"
+ACPX_ADAPTER="$SCRIPT_ROOT/intake/scripts/acpx-llm-task.py"
+DIRECT_ADAPTER="$SCRIPT_ROOT/intake/scripts/real-llm-invoke.py"
 
 run_configured_cmd() {
   # Split the configured command with normal shell parsing, then preserve the
