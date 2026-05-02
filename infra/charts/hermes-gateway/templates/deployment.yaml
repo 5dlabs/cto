@@ -172,6 +172,38 @@ spec:
               value: {{ .Values.model.provider | quote }}
             - name: HERMES_MODEL
               value: {{ .Values.model.default | quote }}
+            - name: CTO_LLM_INVOKE_BACKEND
+              value: {{ .Values.intake.llmBackend | quote }}
+            - name: ACPX_LLM_MODEL
+              value: {{ .Values.intake.model | default .Values.model.default | quote }}
+            - name: ACPX_LLM_TIMEOUT
+              value: {{ .Values.intake.acpxTimeout | quote }}
+            - name: INTAKE_MODEL_PRIMARY_PROVIDER
+              value: {{ .Values.intake.provider | quote }}
+            - name: INTAKE_MODEL_PRIMARY
+              value: {{ .Values.intake.model | default .Values.model.default | quote }}
+            - name: INTAKE_MODEL_FAST_PROVIDER
+              value: {{ .Values.intake.provider | quote }}
+            - name: INTAKE_MODEL_FAST
+              value: {{ .Values.intake.model | default .Values.model.default | quote }}
+            - name: INTAKE_MODEL_FRONTIER_PROVIDER
+              value: {{ .Values.intake.provider | quote }}
+            - name: INTAKE_MODEL_FRONTIER
+              value: {{ .Values.intake.model | default .Values.model.default | quote }}
+            - name: INTAKE_VOTER_1_PROVIDER
+              value: {{ .Values.intake.provider | quote }}
+            - name: INTAKE_VOTER_1_MODEL
+              value: {{ .Values.intake.model | default .Values.model.default | quote }}
+            - name: INTAKE_VOTER_2_PROVIDER
+              value: {{ .Values.intake.provider | quote }}
+            - name: INTAKE_VOTER_2_MODEL
+              value: {{ .Values.intake.model | default .Values.model.default | quote }}
+            - name: INTAKE_VOTER_3_PROVIDER
+              value: {{ .Values.intake.provider | quote }}
+            - name: INTAKE_VOTER_3_MODEL
+              value: {{ .Values.intake.model | default .Values.model.default | quote }}
+            - name: INTAKE_DELIBERATION_VIDEO
+              value: {{ .Values.intake.deliberationVideo | quote }}
             - name: HERMES_YOLO_MODE
               value: "1"
             - name: DISCORD_BOT_TOKEN
