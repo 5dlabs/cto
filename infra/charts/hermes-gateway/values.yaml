@@ -62,6 +62,9 @@ secrets:
   # GitHub repo/workflow token -> GH_TOKEN and GITHUB_TOKEN.
   githubSecretName: cto-coder-api-keys
   githubSecretKey: github-pat
+  # ElevenLabs API key used for Coder Discord TTS.
+  elevenlabsSecretName: openclaw-api-keys
+  elevenlabsSecretKey: elevenlabs-api-key
   # Same token mounted as a file for Hermes terminal subprocesses. Hermes
   # strips GH_TOKEN/GITHUB_TOKEN from tool subprocess env, so `gh` and the git
   # credential helper read this file instead.
@@ -101,6 +104,24 @@ configYaml: |
     mode: {{ .Values.autonomy.approvalsMode | quote }}
     cron_mode: {{ .Values.autonomy.cronMode | quote }}
   hooks_auto_accept: {{ .Values.autonomy.hooksAutoAccept }}
+  stt:
+    provider: "local"
+    local:
+      model: "base"
+  tts:
+    provider: "elevenlabs"
+    elevenlabs:
+      voice_id: "{{ .Values.voice.elevenlabs.voiceId }}"
+      model_id: "{{ .Values.voice.elevenlabs.modelId }}"
+      streaming_model_id: "{{ .Values.voice.elevenlabs.streamingModelId }}"
+
+voice:
+  elevenlabs:
+    # Adam is the upstream Hermes default voice. Override when a dedicated
+    # Coder voice is selected/provisioned in ElevenLabs.
+    voiceId: "pNInz6obpgDQGcFmaJgB"
+    modelId: "eleven_flash_v2_5"
+    streamingModelId: "eleven_flash_v2_5"
 
 instructionFiles:
   soulMd: |
