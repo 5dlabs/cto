@@ -17,6 +17,7 @@ spec:
         {{- include "hermes-gateway.selectorLabels" . | nindent 8 }}
       annotations:
         checksum/config: {{ tpl .Values.configYaml . | sha256sum }}
+        checksum/coder-voice-patch: {{ .Files.Get "scripts/patch-discord-coder-voice.py" | sha256sum }}
     spec:
       serviceAccountName: {{ include "hermes-gateway.serviceAccountName" . }}
       {{- with .Values.podSecurityContext }}
@@ -40,6 +41,10 @@ spec:
               cp /config-template/SOUL.md {{ .Values.persistence.mountPath }}/SOUL.md
               cp /config-template/AGENTS.md {{ .Values.workspace.mountPath }}/AGENTS.md
               cp /config-template/TOOLS.md {{ .Values.workspace.mountPath }}/TOOLS.md
+              if [ -r /config-template/patch-discord-coder-voice.py ]; then
+                python3 /config-template/patch-discord-coder-voice.py
+                python3 -m py_compile /opt/hermes/gateway/platforms/discord.py
+              fi
               cat > {{ .Values.persistence.mountPath }}/home/bin/git-credential-github-token <<'EOF'
               #!/bin/sh
               [ "${1:-get}" = "get" ] || exit 0
@@ -267,6 +272,9 @@ spec:
               readOnly: true
             - name: github-token
               mountPath: {{ .Values.secrets.githubTokenMountPath | quote }}
+              readOnly: true
+            - name: config-template
+              mountPath: /config-template
               readOnly: true
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

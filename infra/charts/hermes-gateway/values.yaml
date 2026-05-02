@@ -12,8 +12,16 @@ image:
 
 # Upstream entrypoint bootstraps .env/config.yaml/SOUL.md from /opt/hermes/examples
 # on first start, then exec's the `hermes` CLI.
-command: ["/opt/hermes/docker/entrypoint.sh"]
-args: ["hermes", "--yolo", "--accept-hooks", "gateway", "run", "--accept-hooks"]
+# Patch Hermes in-place before starting, then delegate to the upstream entrypoint.
+command: ["sh", "-c"]
+args:
+  - |
+    set -eu
+    if [ -r /config-template/patch-discord-coder-voice.py ]; then
+      python3 /config-template/patch-discord-coder-voice.py
+      python3 -m py_compile /opt/hermes/gateway/platforms/discord.py
+    fi
+    exec /opt/hermes/docker/entrypoint.sh hermes --yolo --accept-hooks gateway run --accept-hooks
 
 # HERMES_HOME - upstream image expects state at /opt/data.
 persistence:
