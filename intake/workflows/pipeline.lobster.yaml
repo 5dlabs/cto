@@ -90,32 +90,40 @@ steps:
       r = {}
       for k in ['primary','fast','frontier']:
         d = t.get(k,{})
-        r[k+'_provider'] = d.get('provider','gemini')
-        r[k+'_model'] = d.get('model','gemini-3.1-pro-preview')
-      for i,v in enumerate(cm):
-        r['voter_%d_provider'%(i+1)] = v.get('provider','gemini')
-        r['voter_%d_model'%(i+1)] = v.get('model','gemini-3.1-pro-preview')
+        r[k+'_provider'] = os.environ.get('INTAKE_MODEL_'+k.upper()+'_PROVIDER') or d.get('provider','gemini')
+        r[k+'_model'] = os.environ.get('INTAKE_MODEL_'+k.upper()) or d.get('model','gemini-3.1-pro-preview')
+      voter_count = max(3, len(cm))
+      for i in range(voter_count):
+        v = cm[i] if i < len(cm) else {}
+        r['voter_%d_provider'%(i+1)] = os.environ.get('INTAKE_VOTER_%d_PROVIDER'%(i+1)) or v.get('provider','gemini')
+        r['voter_%d_model'%(i+1)] = os.environ.get('INTAKE_VOTER_%d_MODEL'%(i+1)) or v.get('model','gemini-3.1-pro-preview')
       lin = c.get('defaults',{}).get('linear',{})
       r['linear_team_id'] = lin.get('teamId','')
       caps = {}
-      invoke_cmd = os.environ.get('CTO_LLM_INVOKE_CMD')
-      if invoke_cmd:
-        try:
-          import subprocess
-          proc = subprocess.run(
-            invoke_cmd.split() + ['--tool','provider-capabilities','--action','json'],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=15,
-            check=False,
-          )
-          if proc.returncode == 0 and proc.stdout.strip():
-            caps = json.loads(proc.stdout)
-          else:
-            caps = {'error':'capability_probe_failed','stderr':proc.stderr[:500]}
-        except Exception as exc:
-          caps = {'error':'capability_probe_exception','reason':str(exc)[:500]}
+      try:
+        import shlex, subprocess
+        invoke_cmd = os.environ.get('CTO_LLM_INVOKE_CMD')
+        if invoke_cmd:
+          cmd = shlex.split(invoke_cmd) + ['--tool','provider-capabilities','--action','json']
+        else:
+          cmd = [os.path.join(os.environ.get('WORKSPACE', '.'), 'intake/scripts/llm-invoke.sh'), '--tool','provider-capabilities','--action','json']
+        env = os.environ.copy()
+        env['PATH'] = '/opt/data/workspace/bin:/opt/data/workspace/.npm-local/node_modules/.bin:' + env.get('PATH','')
+        proc = subprocess.run(
+          cmd,
+          text=True,
+          stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE,
+          timeout=30,
+          check=False,
+          env=env,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+          caps = json.loads(proc.stdout)
+        else:
+          caps = {'error':'capability_probe_failed','stderr':proc.stderr[:500]}
+      except Exception as exc:
+        caps = {'error':'capability_probe_exception','reason':str(exc)[:500]}
       r['provider_capabilities'] = caps
       print(json.dumps(r))
       "
@@ -1044,8 +1052,8 @@ steps:
       ARGS=$(jq -n \
         --arg repository_url "$CODEBASE_URL" \
         --arg branch "${pr_base_branch}" \
-        --arg model_primary_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_provider')" \
-        --arg model_primary "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_model')" \
+        --arg model_primary_provider "${INTAKE_MODEL_PRIMARY_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_provider')}" \
+        --arg model_primary "${INTAKE_MODEL_PRIMARY:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_model')}" \
         --arg audio_debug "${audio_debug}" \
         '{repository_url: $repository_url, branch: $branch, model_primary_provider: $model_primary_provider, model_primary: $model_primary, audio_debug: $audio_debug}') &&
       lobster run --mode tool "$WS/intake/workflows/codebase-analysis.lobster.yaml" --args-json "$ARGS" || { "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "codebase-analysis failed" "${audio_debug}" "error" "project ${project_name}"; exit 1; }
@@ -1092,8 +1100,8 @@ steps:
         --arg num_tasks "$NUM_TASKS_INSTRUCTION" \
         --argjson num_tasks_raw "$EFFECTIVE_NUM_TASKS" \
         --arg schema "$WS/intake/schemas/generated-task.schema.json" \
-        --arg provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" \
-        --arg model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')" \
+        --arg provider "${INTAKE_MODEL_FAST_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')}" \
+        --arg model "${INTAKE_MODEL_FAST:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')}" \
         '{ "prompt": ($sys + "\n\n" + $usr),
            "input": { "prd_content": $prd, "codebase_context": $codebase, "design_context": $design_context, "num_tasks": (if $num_tasks_raw > 0 then $num_tasks_raw else "auto" end), "num_tasks_instruction": $num_tasks, "next_id": 1 },
            "schema": $schema, "provider": $provider, "model": $model }') || {
@@ -1217,8 +1225,8 @@ steps:
         --arg infrastructure_context "$INFRA_CTX" \
         --arg design_context "$DESIGN_CTX" \
         --arg schema "$WS/intake/schemas/project-decision-points.schema.json" \
-        --arg provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" \
-        --arg model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')" \
+        --arg provider "${INTAKE_MODEL_FAST_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')}" \
+        --arg model "${INTAKE_MODEL_FAST:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')}" \
         '{ "prompt": ($sys),
            "input": { "prd": $prd, "tasks": $tasks, "codebase_context": $codebase_context, "infrastructure_context": $infrastructure_context, "design_context": $design_context },
            "schema": $schema, "provider": $provider, "model": $model }') || {
@@ -1565,14 +1573,14 @@ steps:
         --arg verify "${verify}" \
         --arg breakpoints "${breakpoints}" \
         --arg linear_session_id "$DELIB_LINEAR_SID" \
-        --arg model_frontier_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_provider')" \
-        --arg model_frontier "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_model')" \
-        --arg voter_1_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_1_provider')" \
-        --arg voter_1_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_1_model')" \
-        --arg voter_2_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_2_provider')" \
-        --arg voter_2_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_2_model')" \
-        --arg voter_3_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_3_provider')" \
-        --arg voter_3_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_3_model')" \
+        --arg model_frontier_provider "${INTAKE_MODEL_FRONTIER_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_provider')}" \
+        --arg model_frontier "${INTAKE_MODEL_FRONTIER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_model')}" \
+        --arg voter_1_provider "${INTAKE_VOTER_1_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_1_provider')}" \
+        --arg voter_1_model "${INTAKE_VOTER_1_MODEL:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_1_model')}" \
+        --arg voter_2_provider "${INTAKE_VOTER_2_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_2_provider')}" \
+        --arg voter_2_model "${INTAKE_VOTER_2_MODEL:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_2_model')}" \
+        --arg voter_3_provider "${INTAKE_VOTER_3_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_3_provider')}" \
+        --arg voter_3_model "${INTAKE_VOTER_3_MODEL:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_3_model')}" \
         --arg parsed_tasks "$INITIAL_TASKS_JSON" \
         --arg decision_points_json "$DECISION_POINTS_JSON" \
         --arg audio_debug "false" \
@@ -1665,7 +1673,9 @@ steps:
         fi
       } > "$GATE_IN"
       GATE_EXIT=0
-      GATE_OUT="$("$root/intake/scripts/quality-gate.sh" --stage "pipeline-deliberation" --input-file "$GATE_IN" --prompt "$root/intake/prompts/quality-gate-deliberation-system.md" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')")" || GATE_EXIT=$?
+      GATE_PROVIDER="${INTAKE_MODEL_FAST_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')}"
+      GATE_MODEL="${INTAKE_MODEL_FAST:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')}"
+      GATE_OUT="$("$root/intake/scripts/quality-gate.sh" --stage "pipeline-deliberation" --input-file "$GATE_IN" --prompt "$root/intake/prompts/quality-gate-deliberation-system.md" --provider "$GATE_PROVIDER" --model "$GATE_MODEL")" || GATE_EXIT=$?
       case "$GATE_EXIT" in
         0)
           printf '%s\n' "$GATE_OUT"
@@ -1766,8 +1776,12 @@ steps:
       printf '%s' "$DESIGN_CONTEXT_BRIEF" > "$CTX_DIR/design.txt"
       printf '%s' "$CODEBASE_CTX" > "$CTX_DIR/codebase.txt"
       LOAD_CFG="$(printf '%s' "$CTO_LOAD_CONFIG_JSON")"
-      INTAKE_MODEL_PRIMARY_PROVIDER="$(printf '%s' "$LOAD_CFG" | jq -r '.primary_provider')"
-      INTAKE_MODEL_PRIMARY="$(printf '%s' "$LOAD_CFG" | jq -r '.primary_model')"
+      INTAKE_MODEL_PRIMARY_PROVIDER="${INTAKE_MODEL_PRIMARY_PROVIDER:-$(printf '%s' "$LOAD_CFG" | jq -r '.primary_provider')}"
+      INTAKE_MODEL_PRIMARY="${INTAKE_MODEL_PRIMARY:-$(printf '%s' "$LOAD_CFG" | jq -r '.primary_model')}"
+      INTAKE_MODEL_FAST_PROVIDER="${INTAKE_MODEL_FAST_PROVIDER:-$(printf '%s' "$LOAD_CFG" | jq -r '.fast_provider')}"
+      INTAKE_MODEL_FAST="${INTAKE_MODEL_FAST:-$(printf '%s' "$LOAD_CFG" | jq -r '.fast_model')}"
+      INTAKE_MODEL_FRONTIER_PROVIDER="${INTAKE_MODEL_FRONTIER_PROVIDER:-$(printf '%s' "$LOAD_CFG" | jq -r '.frontier_provider')}"
+      INTAKE_MODEL_FRONTIER="${INTAKE_MODEL_FRONTIER:-$(printf '%s' "$LOAD_CFG" | jq -r '.frontier_model')}"
       EFFECTIVE_NUM_TASKS="${num_tasks}"
       if ! printf '%s' "$EFFECTIVE_NUM_TASKS" | grep -Eq '^[0-9]+$'; then
         EFFECTIVE_NUM_TASKS="0"
@@ -1806,16 +1820,16 @@ steps:
         --arg run_id "$(printf '%s' "$CTO_REGISTER_RUN_JSON" | jq -r '.run_id // empty')" \
         --arg model_primary_provider "$INTAKE_MODEL_PRIMARY_PROVIDER" \
         --arg model_primary "$INTAKE_MODEL_PRIMARY" \
-        --arg model_fast_provider "$(printf '%s' "$LOAD_CFG" | jq -r '.fast_provider')" \
-        --arg model_fast "$(printf '%s' "$LOAD_CFG" | jq -r '.fast_model')" \
-        --arg model_frontier_provider "$(printf '%s' "$LOAD_CFG" | jq -r '.frontier_provider')" \
-        --arg model_frontier "$(printf '%s' "$LOAD_CFG" | jq -r '.frontier_model')" \
-        --arg voter_1_provider "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_1_provider')" \
-        --arg voter_1_model "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_1_model')" \
-        --arg voter_2_provider "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_2_provider')" \
-        --arg voter_2_model "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_2_model')" \
-        --arg voter_3_provider "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_3_provider')" \
-        --arg voter_3_model "$(printf '%s' "$LOAD_CFG" | jq -r '.voter_3_model')" \
+        --arg model_fast_provider "$INTAKE_MODEL_FAST_PROVIDER" \
+        --arg model_fast "$INTAKE_MODEL_FAST" \
+        --arg model_frontier_provider "$INTAKE_MODEL_FRONTIER_PROVIDER" \
+        --arg model_frontier "$INTAKE_MODEL_FRONTIER" \
+        --arg voter_1_provider "${INTAKE_VOTER_1_PROVIDER:-$(printf '%s' "$LOAD_CFG" | jq -r '.voter_1_provider')}" \
+        --arg voter_1_model "${INTAKE_VOTER_1_MODEL:-$(printf '%s' "$LOAD_CFG" | jq -r '.voter_1_model')}" \
+        --arg voter_2_provider "${INTAKE_VOTER_2_PROVIDER:-$(printf '%s' "$LOAD_CFG" | jq -r '.voter_2_provider')}" \
+        --arg voter_2_model "${INTAKE_VOTER_2_MODEL:-$(printf '%s' "$LOAD_CFG" | jq -r '.voter_2_model')}" \
+        --arg voter_3_provider "${INTAKE_VOTER_3_PROVIDER:-$(printf '%s' "$LOAD_CFG" | jq -r '.voter_3_provider')}" \
+        --arg voter_3_model "${INTAKE_VOTER_3_MODEL:-$(printf '%s' "$LOAD_CFG" | jq -r '.voter_3_model')}" \
         --arg audio_debug "${audio_debug}" \
         --arg skip_workspace_pr "$([ -n "${target_repo_local_path}" ] && echo true || echo false)" \
         '{prd_path: $prd_path, num_tasks: ($num_tasks_raw | tonumber), project_name: $project_name, intake_metadata: $intake_metadata, pr_base_branch: $pr_base_branch, linear_project_id: $linear_project_id, linear_prd_issue_id: $linear_prd_issue_id, linear_team_id: $linear_team_id, linear_agent_map: $linear_agent_map, linear_milestone_map: $linear_milestone_map, pm_url: $pm_url, repository_url: $repository_url, verify: $verify, breakpoints: $breakpoints, linear_session_id: $linear_session_id, linear_issue_id: $linear_issue_id, run_id: $run_id, model_primary_provider: $model_primary_provider, model_primary: $model_primary, model_fast_provider: $model_fast_provider, model_fast: $model_fast, model_frontier_provider: $model_frontier_provider, model_frontier: $model_frontier, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug, skip_workspace_pr: $skip_workspace_pr}') &&
@@ -1915,7 +1929,9 @@ steps:
         done
       } > "$GATE_IN"
       GATE_EXIT=0
-      GATE_OUT="$("$root/intake/scripts/quality-gate.sh" --stage "pipeline-intake-output" --input-file "$GATE_IN" --provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" --model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')")" || GATE_EXIT=$?
+      GATE_PROVIDER="${INTAKE_MODEL_FAST_PROVIDER:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')}"
+      GATE_MODEL="${INTAKE_MODEL_FAST:-$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')}"
+      GATE_OUT="$("$root/intake/scripts/quality-gate.sh" --stage "pipeline-intake-output" --input-file "$GATE_IN" --provider "$GATE_PROVIDER" --model "$GATE_MODEL")" || GATE_EXIT=$?
       case "$GATE_EXIT" in
         0)
           printf '%s\n' "$GATE_OUT"

@@ -78,9 +78,9 @@ else
   fail "custom harness did not receive expected args" "$(cat "$HARNESS_LOG" 2>/dev/null || true)"
 fi
 
-if output=$(env -u CTO_LLM_INVOKE_CMD PATH="$TMPDIR_TEST/bin:$PATH" "$ROOT/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS" 2>&1); then
+if output=$(env -u CTO_LLM_INVOKE_CMD -u CTO_LLM_INVOKE_BACKEND PATH="$TMPDIR_TEST/bin:/usr/local/bin:/usr/bin:/bin" "$ROOT/intake/scripts/llm-invoke.sh" --tool llm-task --action json --args-json "$ARGS" 2>&1); then
   fail "llm-invoke.sh should fail clearly when no harness is available" "$output"
-elif grep -qi 'No LLM harness command configured' <<<"$output"; then
+elif grep -qi 'No LLM harness backend is available\|ACPX binary not found\|Set one of:' <<<"$output"; then
   pass "missing harness produces actionable error"
 else
   fail "missing harness error should be actionable" "$output"

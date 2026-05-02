@@ -74,6 +74,17 @@ model:
   provider: copilot
   default: gpt-5.5
 
+# Intake workflow LLM routing for Hermes-run Lobster jobs. Keep this aligned
+# with cto-config defaults so design, deliberation, task generation, voters,
+# quality gates, and artifact generation all use Copilot/GPT-5.5 unless a run
+# deliberately overrides them.
+intake:
+  llmBackend: acp
+  acpxTimeout: "300"
+  provider: github-copilot
+  model: gpt-5.5
+  deliberationVideo: "0"
+
 autonomy:
   maxTurns: 90
   approvalsMode: "off"
