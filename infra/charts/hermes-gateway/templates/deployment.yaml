@@ -226,6 +226,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.githubSecretName | quote }}
                   key: {{ .Values.secrets.githubSecretKey | quote }}
+            - name: ELEVENLABS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.elevenlabsSecretName | quote }}
+                  key: {{ .Values.secrets.elevenlabsSecretKey | quote }}
             {{- if .Values.discord.allowedUsers }}
             - name: DISCORD_ALLOWED_USERS
               value: {{ .Values.discord.allowedUsers | quote }}
