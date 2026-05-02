@@ -13,3 +13,5 @@ data:
     {{- tpl .Values.instructionFiles.agentsMd . | nindent 4 }}
   TOOLS.md: |
     {{- tpl .Values.instructionFiles.toolsMd . | nindent 4 }}
+  patch-discord-coder-voice.py: |
+{{ .Files.Get "scripts/patch-discord-coder-voice.py" | indent 4 }}
