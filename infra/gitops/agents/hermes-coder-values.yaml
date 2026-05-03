@@ -64,6 +64,11 @@ messaging:
       spawnSubagentSessions: true
       spawnAcpSessions: true
 
+codexPlugin:
+  # The Hermes Coder gateway image does not currently ship an OpenClaw codex
+  # plugin package; leaving the stale plugin enabled creates config warnings.
+  enabled: false
+
 # Keep Kubernetes probes disabled until this chart has a first-class
 # gateway-vs-harness runtime mode switch. The current container entrypoint
 # still sleeps for harness iteration, so gateway recovery is supervised
