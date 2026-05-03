@@ -14,6 +14,11 @@ namespace: cto
 # Persistent, stable pod identity — debug bot is exec'd into repeatedly.
 deploymentMode: statefulset
 
+gateway:
+  # This agent should check into Discord automatically; the Hermes harness
+  # template is still staged in /workspace/.harness for manual smoke runs.
+  runAsMain: true
+
 agent:
   id: hermes-coder
   name: "Hermes Coder"

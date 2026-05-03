@@ -776,8 +776,14 @@ spec:
                 rm -f /workspace/.harness/container.sh
               fi
               echo "[hermes] Render with: npx -y handlebars /workspace/.harness/container.sh.hbs --output /workspace/.harness/container.sh"
+              {{- if .Values.gateway.runAsMain }}
+              echo "[openclaw] Starting gateway as main process"
+              export OPENCLAW_CONFIG=/workspace/.openclaw/openclaw.json
+              exec openclaw gateway
+              {{- else }}
               echo "[hermes] Pod is sleeping; exec in with: kubectl exec -it <pod> -- /bin/bash"
               exec sleep infinity
+              {{- end }}
           lifecycle:
             postStart:
               exec:

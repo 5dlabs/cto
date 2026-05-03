@@ -319,6 +319,10 @@ gateway:
   port: 18789
   # In Kubernetes, gateway runs locally inside the pod (no remote SSH)
   mode: "local"
+  # When true, the agent container runs `openclaw gateway` as its main process.
+  # When false, the pod keeps the Hermes harness staged and sleeps for manual
+  # smoke/debug runs.
+  runAsMain: false
   # Pod-internal gateway — static token for health probes
   auth:
     token: "openclaw-internal"
