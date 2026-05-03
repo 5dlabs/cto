@@ -18,7 +18,7 @@ export interface PresenceInbound {
     parent_channel_id?: string;
   };
   text?: string;
-  attachments?: Array<{ url: string; content_type?: string; filename?: string }>;
+  attachments?: Array<{ id?: string; url: string; content_type?: string; filename?: string; size?: number; spoiler?: boolean }>;
   metadata?: Record<string, string>;
   session_key?: string;
 }

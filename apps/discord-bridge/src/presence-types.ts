@@ -5,8 +5,11 @@ export type PresenceStatusState = "started" | "running" | "blocked" | "done" | "
 
 export interface PresenceAttachment {
   url: string;
+  id?: string;
   content_type?: string;
   filename?: string;
+  size?: number;
+  spoiler?: boolean;
 }
 
 export interface PresenceDiscordContext {
@@ -99,6 +102,28 @@ function stringMapField(obj: Record<string, unknown>, key: string): ValidationRe
   return { ok: true, value: value as Record<string, string> };
 }
 
+function validateAttachments(value: unknown): ValidationResult<PresenceAttachment[] | undefined> {
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+  if (
+    !Array.isArray(value) ||
+    !value.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.url === "string" &&
+        (item.id === undefined || typeof item.id === "string") &&
+        (item.content_type === undefined || typeof item.content_type === "string") &&
+        (item.filename === undefined || typeof item.filename === "string") &&
+        (item.size === undefined || (typeof item.size === "number" && item.size >= 0)) &&
+        (item.spoiler === undefined || typeof item.spoiler === "boolean"),
+    )
+  ) {
+    return { ok: false, error: "attachments must be an array of valid attachment objects" };
+  }
+  return { ok: true, value: value as PresenceAttachment[] };
+}
+
 function isPresenceRuntime(value: unknown): value is PresenceRuntime {
   return value === "openclaw" || value === "hermes" || value === "hosted";
 }
@@ -158,12 +183,9 @@ export function validatePresenceDiscordEvent(payload: unknown): ValidationResult
     return { ok: false, error: discord.error };
   }
 
-  const attachments = payload.attachments;
-  if (
-    attachments !== undefined &&
-    (!Array.isArray(attachments) || !attachments.every((item) => isRecord(item) && typeof item.url === "string"))
-  ) {
-    return { ok: false, error: "attachments must be an array of objects with url" };
+  const attachments = validateAttachments(payload.attachments);
+  if (attachments.ok === false) {
+    return { ok: false, error: attachments.error };
   }
 
   const metadata = stringMapField(payload, "metadata");
@@ -182,7 +204,7 @@ export function validatePresenceDiscordEvent(payload: unknown): ValidationResult
       coderun_id: optionalStringField(payload, "coderun_id"),
       discord: discord.value,
       text: optionalStringField(payload, "text"),
-      attachments: attachments as PresenceAttachment[] | undefined,
+      attachments: attachments.value,
       metadata: metadata.value,
     },
   };
@@ -210,12 +232,9 @@ export function validatePresenceInbound(payload: unknown): ValidationResult<Pres
     return { ok: false, error: discord.error };
   }
 
-  const attachments = payload.attachments;
-  if (
-    attachments !== undefined &&
-    (!Array.isArray(attachments) || !attachments.every((item) => isRecord(item) && typeof item.url === "string"))
-  ) {
-    return { ok: false, error: "attachments must be an array of objects with url" };
+  const attachments = validateAttachments(payload.attachments);
+  if (attachments.ok === false) {
+    return { ok: false, error: attachments.error };
   }
 
   const metadata = stringMapField(payload, "metadata");
@@ -235,7 +254,7 @@ export function validatePresenceInbound(payload: unknown): ValidationResult<Pres
       coderun_id: optionalStringField(payload, "coderun_id"),
       discord: discord.value,
       text: optionalStringField(payload, "text"),
-      attachments: attachments as PresenceAttachment[] | undefined,
+      attachments: attachments.value,
       metadata: metadata.value,
     },
   };

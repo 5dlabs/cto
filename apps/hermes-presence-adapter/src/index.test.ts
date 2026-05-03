@@ -114,6 +114,26 @@ test("rejects inbound metadata values that are not strings", async () => {
   }
 });
 
+test("rejects malformed attachment metadata before Hermes input", async () => {
+  const server = createAdapterServer(config());
+  const baseUrl = await listen(server);
+  try {
+    const inbound = event();
+    Object.assign(inbound, { attachments: [{ url: "https://cdn.example/file.png", size: -1 }] });
+
+    const response = await fetch(`${baseUrl}/presence/inbound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer shared-token" },
+      body: JSON.stringify(inbound),
+    });
+
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /attachments must be an array of valid attachment objects/);
+  } finally {
+    await close(server);
+  }
+});
+
 test("posts non-fatal presence status intents and sends Hermes input payloads", async () => {
   const statuses: unknown[] = [];
   const hermesRequests: unknown[] = [];

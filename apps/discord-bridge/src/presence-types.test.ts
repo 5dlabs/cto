@@ -45,3 +45,51 @@ test("rejects non-string metadata values on worker inbound events", () => {
     assert.match(result.error, /metadata must be a string map/);
   }
 });
+
+test("rejects malformed attachments on normalized Discord events", () => {
+  const result = validatePresenceDiscordEvent({
+    schema: "cto.presence.v1",
+    event_type: "message",
+    discord: { account_id: "discord-bot", channel_id: "channel-1" },
+    attachments: [{ url: "https://cdn.example/file.png", size: -1 }],
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.error, /attachments must be an array of valid attachment objects/);
+  }
+});
+
+test("accepts rich attachment metadata on worker inbound events", () => {
+  const result = validatePresenceInbound({
+    schema: "cto.presence.v1",
+    event_type: "message",
+    runtime: "hermes",
+    agent_id: "rex",
+    discord: { account_id: "discord-bot", channel_id: "channel-1" },
+    attachments: [
+      {
+        id: "att-1",
+        url: "https://cdn.example/file.png",
+        content_type: "image/png",
+        filename: "file.png",
+        size: 12345,
+        spoiler: true,
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.deepEqual(result.value.attachments, [
+      {
+        id: "att-1",
+        url: "https://cdn.example/file.png",
+        content_type: "image/png",
+        filename: "file.png",
+        size: 12345,
+        spoiler: true,
+      },
+    ]);
+  }
+});

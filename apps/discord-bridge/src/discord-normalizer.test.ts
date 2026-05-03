@@ -17,7 +17,17 @@ function message(overrides: Record<string, unknown> = {}): Record<string, unknow
       ]),
     },
     attachments: new Map([
-      ["att-1", { url: "https://cdn.example/file.png", contentType: "image/png", name: "file.png" }],
+      [
+        "att-1",
+        {
+          id: "att-1",
+          url: "https://cdn.example/file.png",
+          contentType: "image/png",
+          name: "file.png",
+          size: 12345,
+          spoiler: true,
+        },
+      ],
     ]),
     ...overrides,
   };
@@ -38,7 +48,16 @@ test("normalizes guild messages into cto.presence.v1 without Discord credentials
   assert.equal(event?.discord.chat_type, "group");
   assert.equal(event?.text, "<@bot> rex please investigate");
   assert.deepEqual(event?.discord.mentioned_agent_ids, ["123456789012345678", "rex"]);
-  assert.deepEqual(event?.attachments, [{ url: "https://cdn.example/file.png", content_type: "image/png", filename: "file.png" }]);
+  assert.deepEqual(event?.attachments, [
+    {
+      id: "att-1",
+      url: "https://cdn.example/file.png",
+      content_type: "image/png",
+      filename: "file.png",
+      size: 12345,
+      spoiler: true,
+    },
+  ]);
   assert.equal(JSON.stringify(event).includes("DISCORD_BRIDGE_TOKEN"), false);
 });
 

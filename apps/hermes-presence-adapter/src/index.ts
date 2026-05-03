@@ -43,6 +43,30 @@ function isStringMap(value: unknown): value is Record<string, string> {
   );
 }
 
+function validateAttachmentItem(item: unknown): item is { id?: string; url: string; content_type?: string; filename?: string; size?: number; spoiler?: boolean } {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return false;
+  }
+  const attachment = item as { id?: unknown; url?: unknown; content_type?: unknown; filename?: unknown; size?: unknown; spoiler?: unknown };
+  return (
+    typeof attachment.url === "string" &&
+    (attachment.id === undefined || typeof attachment.id === "string") &&
+    (attachment.content_type === undefined || typeof attachment.content_type === "string") &&
+    (attachment.filename === undefined || typeof attachment.filename === "string") &&
+    (attachment.size === undefined || (typeof attachment.size === "number" && Number.isFinite(attachment.size) && attachment.size >= 0)) &&
+    (attachment.spoiler === undefined || typeof attachment.spoiler === "boolean")
+  );
+}
+
+function validateAttachments(value: unknown): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value) || !value.every(validateAttachmentItem)) {
+    throw new Error("attachments must be an array of valid attachment objects");
+  }
+}
+
 function validateInbound(payload: unknown): PresenceInbound {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("payload must be an object");
@@ -57,6 +81,7 @@ function validateInbound(payload: unknown): PresenceInbound {
   if (event.metadata !== undefined && !isStringMap(event.metadata)) {
     throw new Error("metadata must be a string map");
   }
+  validateAttachments(event.attachments);
   return event as PresenceInbound;
 }
 

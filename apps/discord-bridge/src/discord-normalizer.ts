@@ -14,11 +14,14 @@ interface DiscordLikeUser {
 }
 
 interface DiscordLikeAttachment {
+  id?: string;
   url?: string;
   contentType?: string | null;
   content_type?: string;
   name?: string | null;
   filename?: string;
+  size?: number;
+  spoiler?: boolean;
 }
 
 interface DiscordLikeChannel {
@@ -64,8 +67,11 @@ function normalizeAttachments(attachments: unknown): PresenceDiscordEvent["attac
   return valuesFromCollection<DiscordLikeAttachment>(attachments)
     .map((attachment) => ({
       url: attachment.url ?? "",
+      id: attachment.id,
       content_type: attachment.contentType ?? attachment.content_type,
       filename: attachment.name ?? attachment.filename,
+      size: attachment.size,
+      spoiler: attachment.spoiler,
     }))
     .filter((attachment) => attachment.url);
 }
