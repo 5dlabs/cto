@@ -17,6 +17,40 @@ from pathlib import Path
 
 path = Path("/opt/hermes/gateway/platforms/discord.py")
 text = path.read_text()
+changed = False
+
+helper_marker = """    async def _run_post_connect_initialization(self) -> None:
+        \"\"\"Finish non-critical startup work after Discord is connected.\"\"\"
+        if not self._client:
+            return
+        try:
+            sync_policy = self._get_discord_command_sync_policy()
+"""
+
+helper_insert = """    async def _run_post_connect_initialization(self) -> None:
+        \"\"\"Finish non-critical startup work after Discord is connected.\"\"\"
+        if not self._client:
+            return
+        try:
+            cto_guild = discord.Object(id=1490117571977019524)
+            self._client.tree.copy_global_to(guild=cto_guild)
+            synced = await self._client.tree.sync(guild=cto_guild)
+            logger.info(
+                \"[%s] Synced %d CTO guild slash command(s)\",
+                self.name,
+                len(synced),
+            )
+        except Exception as e:
+            logger.warning(\"[%s] CTO guild slash command sync failed: %s\", self.name, e, exc_info=True)
+        try:
+            sync_policy = self._get_discord_command_sync_policy()
+"""
+
+if "Synced %d CTO guild slash command(s)" not in text:
+    if helper_marker not in text:
+        raise SystemExit("post-connect initialization block not found")
+    text = text.replace(helper_marker, helper_insert)
+    changed = True
 
 marker = """        @tree.command(name=\"voice\", description=\"Toggle voice reply mode\")
         @discord.app_commands.describe(mode=\"Voice mode: on, off, tts, channel, leave, or status\")
@@ -63,4 +97,7 @@ if "coder_group = discord.app_commands.Group(" not in text:
     if marker not in text:
         raise SystemExit("voice slash command block not found")
     text = text.replace(marker, insert)
+    changed = True
+
+if changed:
     path.write_text(text)
