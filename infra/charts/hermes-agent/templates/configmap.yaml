@@ -351,6 +351,9 @@ data:
           {{- if .Values.nats.enabled }}
           {{- $pluginEntries = append $pluginEntries "\"nats-messenger\"" }}
           {{- end }}
+          {{- if $discordConfig.enabled }}
+          {{- $pluginEntries = append $pluginEntries "\"discord\"" }}
+          {{- end }}
           {{- if and (hasKey $mem0Plugin "enabled") $mem0Plugin.enabled }}
           {{- $pluginEntries = append $pluginEntries "\"openclaw-mem0\"" }}
           {{- end }}
