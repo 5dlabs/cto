@@ -30,7 +30,7 @@ Each completed row should include:
 | Agent coordination | `UNIT_PASS` | Wave 2A runtime-neutral envelope/addressing contract and pure TypeScript helper skeleton are documented and unit-tested; validators now reject unknown message/runtime/address enums before transport adapters trust payloads. Durable registry/inbox/service implementation remains. |
 | Memory/skills lifecycle | `NOT_STARTED` | Policy/tooling not implemented. |
 | OpenClaw/hosted | `NOT_STARTED` | Runtime type exists; adapters/examples and contract tests remain. |
-| Ops hardening | `UNIT_PASS` | Workflow audit now confirms the existing Discord bridge publish workflow and a local Hermes adapter publish workflow candidate are syntax-valid; Hermes workflow still must land on `main` and publish successfully before final `PASS`. Missing runbook, scale/failure validation, and rollback docs remain. |
+| Ops hardening | `UNIT_PASS` | Workflow audit now confirms the existing Discord bridge publish workflow and a local Hermes adapter publish workflow candidate are syntax-valid; Hermes workflow still must land on `main` and publish successfully before final `PASS`. Operator runbook/rollback skeleton now exists; live scale/failure validation and redacted diagnostics remain. |
 
 ## Discord surfaces and input coverage
 
@@ -148,8 +148,8 @@ Each completed row should include:
 | OPS-04 | ArgoCD apps healthy after rollout | `NOT_STARTED` | TBD | Inspect ArgoCD/app health. | Apps are synced and healthy. | TBD |
 | OPS-05 | Redacted route/register/delete/delivery logs | `NOT_STARTED` | TBD | Exercise route lifecycle and inspect logs. | Logs include useful route/runtime metadata and no secrets. | TBD |
 | OPS-06 | Redacted outbound intent audit logs | `NOT_STARTED` | TBD | Exercise outbound intents and inspect logs. | Logs include effect type/status and no secret/token/message leakage beyond policy. | TBD |
-| OPS-07 | Operator runbook exists | `NOT_STARTED` | TBD | Review runbook. | Fresh operator can run smoke tests and interpret failures. | TBD |
-| OPS-08 | Rollback instructions exist | `NOT_STARTED` | TBD | Review runbook/release notes. | Rollback path for bridge/adapters/manifests is documented. | TBD |
+| OPS-07 | Operator runbook exists | `UNIT_PASS` | `2026-05-03T23:37:57Z` reviewed `docs/2026-04/validation/control-plane-operator-runbook.md`; `git diff --check`, `python3 -m py_compile scripts/presence-smoke-hermes-coderun.py scripts/presence-morgan-task-smoke.py`, and dry-run Hermes CodeRun smoke passed. | Fresh operator has local/package validation commands, safe dry-run and live-smoke procedures, no-secret rules, and troubleshooting paths. | Runbook exists locally; needs operator dry-run/live rehearsal before final `PASS`. |
+| OPS-08 | Rollback instructions exist | `UNIT_PASS` | `2026-05-03T23:37:57Z` reviewed rollback section in `docs/2026-04/validation/control-plane-operator-runbook.md`; no cluster mutation performed. | Rollback path prefers GitOps revert/previous image pin, documents emergency drift recording, and identifies post-rollback checks. | Needs a real rollback rehearsal or incident validation before final `PASS`. |
 | OPS-09 | 10-Hermes-pod registration scale smoke | `NOT_STARTED` | TBD | Run scale script with 10 disposable registrations. | Registry/fanout remains correct. | TBD |
 | OPS-10 | 50/100-Hermes-pod registration scale smoke | `NOT_STARTED` | TBD | Run scale script with 50/100 disposable registrations. | System stays within latency/error thresholds. | TBD |
 | OPS-11 | Route collision/stale route expiry failure test | `NOT_STARTED` | TBD | Force duplicate/colliding/stale routes. | Collision and expiry behavior is deterministic and safe. | TBD |
