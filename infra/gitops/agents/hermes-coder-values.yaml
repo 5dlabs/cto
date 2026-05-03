@@ -1,14 +1,12 @@
 # =============================================================================
 # Hermes Coder Agent — Per-Agent Values Override
 # =============================================================================
-# Persistent debug bot for the Hermes harness. The pod runs `sleep infinity`
-# with the raw Handlebars-templated harness script mounted at
-# /etc/hermes/container.sh.hbs (and staged at /workspace/.harness/).
-# A human `kubectl exec`s in and renders/runs the script manually.
+# Persistent Hermes Coder workspace. The pod keeps the Hermes harness
+# template staged for manual smoke runs, while also joining Discord through
+# the OpenClaw gateway so recovery/status work can happen from chat.
 #
-# This override disables OpenClaw's gateway-mode messaging (NATS, Discord)
-# since the bot is not participating in the agent mesh — it's a manual
-# debugging surface for the harness itself.
+# Keep credential material in Kubernetes Secrets. This file only names secret
+# keys and allowlisted Discord IDs.
 # =============================================================================
 
 namespace: cto
@@ -27,17 +25,44 @@ image:
   tag: "latest"
   pullPolicy: Always
 
-# Disable cross-pod agent messaging — this is a standalone debug bot.
+# Keep cross-pod NATS messaging disabled; this bot is not part of the
+# multi-agent mesh.
 nats:
   enabled: false
 
-# Disable Discord/web messaging — debug bot doesn't need a chat surface.
+# Enable the Discord gateway for the regular Coder bot. The chart renders
+# DISCORD_TOKEN from openclaw-discord-tokens[coder] at runtime; do not put
+# token values in Git.
 messaging:
   discord:
-    enabled: false
+    enabled: true
+    tokenSecretKey: coder
+    allowBots: mentions
+    groupPolicy: allowlist
+    dmPolicy: allowlist
+    allowFrom:
+      - "444519104808878090"
+    guilds:
+      "*":
+        requireMention: true
+        users:
+          - "444519104808878090"
+      "1490117571977019524":
+        requireMention: true
+        slug: "5dlabs-coder"
+        channels:
+          "1494057364301545542":
+            enabled: true
+            requireMention: false
+    threadBindings:
+      enabled: true
+      spawnSubagentSessions: true
+      spawnAcpSessions: true
 
-# Agent container runs `sleep infinity` (no gateway). Disable HTTP health
-# probes that would otherwise crashloop the pod.
+# Keep Kubernetes probes disabled until this chart has a first-class
+# gateway-vs-harness runtime mode switch. The current container entrypoint
+# still sleeps for harness iteration, so gateway recovery is supervised
+# manually inside the persistent pod.
 probes:
   startup:
     enabled: false
