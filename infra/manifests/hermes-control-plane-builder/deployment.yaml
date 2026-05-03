@@ -306,19 +306,17 @@ spec:
           livenessProbe:
             exec:
               command:
-                - sh
-                - -c
-                - pgrep -f 'hermes' >/dev/null
+                - /patches/gateway-health.sh
             initialDelaySeconds: 30
             periodSeconds: 30
+            timeoutSeconds: 10
           readinessProbe:
             exec:
               command:
-                - sh
-                - -c
-                - pgrep -f 'hermes' >/dev/null
+                - /patches/gateway-health.sh
             initialDelaySeconds: 10
             periodSeconds: 15
+            timeoutSeconds: 10
           volumeMounts:
             - name: data
               mountPath: /opt/data

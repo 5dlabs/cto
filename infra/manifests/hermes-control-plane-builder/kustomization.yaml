@@ -6,6 +6,7 @@ configMapGenerator:
   - name: cto-hermes-coder-control-patches
     files:
       - patch-discord-sethome.py
+      - gateway-health.sh=scripts/gateway-health.sh
 
 generatorOptions:
   disableNameSuffixHash: true
