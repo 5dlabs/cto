@@ -328,6 +328,24 @@ spec:
               cd /workspace
               {{- end }}
 
+              {{- if $discordConfig.enabled }}
+              # ---------------------------------------------------------------
+              # 4c. Discord channel plugin (@openclaw/discord)
+              # ---------------------------------------------------------------
+              export HOME=/workspace
+              echo "[plugin] discord: ensuring @openclaw/discord is installed"
+              if ! OPENCLAW_CONFIG=/tmp/openclaw-plugin-bootstrap.json openclaw plugins inspect discord >/dev/null 2>&1; then
+                if OPENCLAW_CONFIG=/tmp/openclaw-plugin-bootstrap.json openclaw plugins install @openclaw/discord 2>&1 | tail -8; then
+                  echo "[plugin] discord: installed"
+                else
+                  echo "[plugin] discord: install failed"
+                fi
+              else
+                echo "[plugin] discord: already installed"
+              fi
+              cd /workspace
+              {{- end }}
+
               {{- if .Values.nats.enabled }}
               # ---------------------------------------------------------------
               # 4c. NATS Messenger plugin
