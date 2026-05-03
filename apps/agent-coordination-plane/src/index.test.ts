@@ -117,3 +117,27 @@ test("rejects malformed coordination envelopes and non-string metadata", () => {
     );
   }
 });
+
+test("rejects unknown message kinds, priorities, runtimes, and address kinds", () => {
+  const envelope = sampleEnvelope() as unknown as Record<string, unknown>;
+  envelope.message = {
+    ...(envelope.message as Record<string, unknown>),
+    kind: "discord-message",
+    priority: "eventually",
+    from: {
+      ...((envelope.message as Record<string, unknown>).from as Record<string, unknown>),
+      runtime: "discord-bot",
+    },
+    to: { kind: "discord-channel", channelId: "chan-1" },
+  };
+
+  const result = validateAgentEnvelope(envelope);
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.deepEqual(
+      result.issues.map((entry) => entry.path),
+      ["message.kind", "message.priority", "message.from.runtime", "message.to.kind"],
+    );
+  }
+});

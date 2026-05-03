@@ -52,6 +52,17 @@ function validateOptionalStringMap(value: unknown, path: string, issues: Validat
   }
 }
 
+const VALID_AGENT_RUNTIMES = new Set(["hermes", "openclaw", "external", "unknown"]);
+const VALID_MESSAGE_KINDS = new Set(["command", "request", "response", "event", "status", "discovery"]);
+const VALID_MESSAGE_PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
+const VALID_ADDRESS_KINDS = new Set(["agent", "role", "task", "project", "group", "broadcast"]);
+
+function validateEnum(value: unknown, allowed: Set<string>, path: string, issues: ValidationIssue[]): void {
+  if (typeof value !== "string" || !allowed.has(value)) {
+    issues.push(issue(path, `must be one of: ${Array.from(allowed).join(", ")}`));
+  }
+}
+
 export function safeSubjectSegment(value: string | undefined, fallback = "unknown"): string {
   return (value ?? fallback)
     .toLowerCase()
@@ -155,20 +166,23 @@ export function validateAgentEnvelope(value: unknown): ValidationResult<AgentEnv
     issues.push(issue("message", "must be an object"));
   } else {
     validateString(message.messageId, "message.messageId", issues);
-    validateString(message.kind, "message.kind", issues);
+    validateEnum(message.kind, VALID_MESSAGE_KINDS, "message.kind", issues);
     validateString(message.createdAt, "message.createdAt", issues);
+    if (message.priority !== undefined) {
+      validateEnum(message.priority, VALID_MESSAGE_PRIORITIES, "message.priority", issues);
+    }
     if (!isRecord(message.from)) {
       issues.push(issue("message.from", "must be an object"));
     } else {
       validateString(message.from.agentId, "message.from.agentId", issues);
       validateString(message.from.role, "message.from.role", issues);
-      validateString(message.from.runtime, "message.from.runtime", issues);
+      validateEnum(message.from.runtime, VALID_AGENT_RUNTIMES, "message.from.runtime", issues);
       validateOptionalStringMap(message.from.metadata, "message.from.metadata", issues);
     }
     if (!isRecord(message.to)) {
       issues.push(issue("message.to", "must be an object"));
     } else {
-      validateString(message.to.kind, "message.to.kind", issues);
+      validateEnum(message.to.kind, VALID_ADDRESS_KINDS, "message.to.kind", issues);
     }
     validateOptionalStringMap(message.metadata, "message.metadata", issues);
   }
