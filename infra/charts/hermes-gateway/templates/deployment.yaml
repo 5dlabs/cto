@@ -1,13 +1,22 @@
 apiVersion: apps/v1
+{{- if .Values.statefulset.enabled }}
+kind: StatefulSet
+{{- else }}
 kind: Deployment
+{{- end }}
 metadata:
   name: {{ include "hermes-gateway.fullname" . }}
   labels:
     {{- include "hermes-gateway.labels" . | nindent 4 }}
 spec:
   replicas: 1
+  {{- if .Values.statefulset.enabled }}
+  serviceName: {{ include "hermes-gateway.fullname" . }}-headless
+  podManagementPolicy: OrderedReady
+  {{- else }}
   strategy:
     type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "hermes-gateway.selectorLabels" . | nindent 6 }}
@@ -281,25 +290,18 @@ spec:
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
             exec:
-              command: ["sh", "-c", "pgrep -f 'hermes' >/dev/null"]
+              command: ["sh", "-c", {{ .Values.probes.liveness.command | default "pgrep -f 'hermes' >/dev/null" | quote }}]
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
           {{- end }}
           {{- if .Values.probes.readiness.enabled }}
           readinessProbe:
             exec:
-              command: ["sh", "-c", "pgrep -f 'hermes' >/dev/null"]
+              command: ["sh", "-c", {{ .Values.probes.readiness.command | default "pgrep -f 'hermes' >/dev/null" | quote }}]
             initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
           {{- end }}
       volumes:
-        - name: data
-          {{- if .Values.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "hermes-gateway.fullname" . }}-data
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
         - name: config-template
           configMap:
             name: {{ include "hermes-gateway.fullname" . }}-config
@@ -310,6 +312,15 @@ spec:
             items:
               - key: {{ .Values.secrets.githubSecretKey | quote }}
                 path: token
+        {{- if not .Values.statefulset.enabled }}
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "hermes-gateway.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -322,3 +333,19 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  {{- if .Values.statefulset.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "hermes-gateway.labels" . | nindent 10 }}
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size | quote }}
+        {{- if .Values.persistence.storageClassName }}
+        storageClassName: {{ .Values.persistence.storageClassName | quote }}
+        {{- end }}
+  {{- end }}

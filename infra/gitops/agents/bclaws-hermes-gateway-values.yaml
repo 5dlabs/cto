@@ -1,9 +1,9 @@
 # Default values for hermes-gateway.
-# This chart deploys upstream nousresearch/hermes-agent as the single
-# production Discord process for Coder.
+# This values file deploys upstream nousresearch/hermes-agent as the persistent
+# production Discord process for Bclaws.
 
 nameOverride: ""
-fullnameOverride: ""
+fullnameOverride: "bclaws-hermes-gateway"
 
 image:
   repository: docker.io/nousresearch/hermes-agent
@@ -25,10 +25,7 @@ args:
 
 # HERMES_HOME - upstream image expects state at /opt/data.
 statefulset:
-  # StatefulSet mode gives each bot a stable pod identity and durable per-pod
-  # volume claim. Leave disabled for the existing Coder deployment to avoid
-  # changing its PVC name/kind in place; enable for new bots such as Bclaws.
-  enabled: false
+  enabled: true
 
 persistence:
   enabled: true
@@ -67,16 +64,16 @@ resources:
 secrets:
   # Optional provider/tool credentials still loaded by envFrom.
   hermesSecretName: hermes-coder-secrets
-  # Discord bot token, key `coder` -> DISCORD_BOT_TOKEN.
+  # Discord bot token, key `bclaws` -> DISCORD_BOT_TOKEN.
   discordSecretName: openclaw-discord-tokens
-  discordSecretKey: coder
+  discordSecretKey: bclaws
   # GitHub Copilot OAuth token -> COPILOT_GITHUB_TOKEN.
   copilotSecretName: cto-secrets
   copilotSecretKey: COPILOT_GITHUB_TOKEN
   # GitHub repo/workflow token -> GH_TOKEN and GITHUB_TOKEN.
   githubSecretName: cto-coder-api-keys
   githubSecretKey: github-pat
-  # ElevenLabs API key used for Coder Discord TTS.
+  # ElevenLabs API key used for Bclaws Discord TTS.
   elevenlabsSecretName: openclaw-api-keys
   elevenlabsSecretKey: elevenlabs-api-key
   # Same token mounted as a file for Hermes terminal subprocesses. Hermes
@@ -139,9 +136,9 @@ voice:
 
 instructionFiles:
   soulMd: |
-    # Coder Runtime Persona
+    # Bclaws Runtime Persona
 
-    You are Coder, the production CTO Discord coding agent running on Hermes.
+    You are Bclaws, a production CTO Discord agent running on Hermes.
     Be concise, practical, and bias toward verified action over speculation.
 
     ## Runtime
@@ -163,9 +160,9 @@ instructionFiles:
     - Verify meaningful changes before claiming success.
 
   agentsMd: |
-    # Coder Workspace Instructions
+    # Bclaws Workspace Instructions
 
-    You are in the Hermes/Coder persistent workspace.
+    You are in the Hermes/Bclaws persistent workspace.
 
     ## Paths
 
@@ -191,7 +188,7 @@ instructionFiles:
     - Keep generated scratch files inside the workspace or `/tmp`; do not write secrets to disk.
 
   toolsMd: |
-    # Coder Tool Guide
+    # Bclaws Tool Guide
 
     ## GitHub
 

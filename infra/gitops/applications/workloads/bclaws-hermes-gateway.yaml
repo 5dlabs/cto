@@ -1,0 +1,64 @@
+---
+# =============================================================================
+# Bclaws Hermes Gateway - Argo CD Application
+# =============================================================================
+# # Deploys the upstream nousresearch/hermes-agent image as the persistent
+# Hermes Discord process for Bclaws (`hermes gateway run`) in the cto namespace.
+# This follows the same production Hermes gateway flow as Coder.
+#
+# Required pre-existing secrets in the cto namespace:
+#   - hermes-coder-secrets       (optional provider/tool credentials shared with Coder)
+#   - openclaw-discord-tokens    (key `bclaws` -> DISCORD_BOT_TOKEN)
+#   - cto-secrets                (key `COPILOT_GITHUB_TOKEN` -> COPILOT_GITHUB_TOKEN)
+#   - cto-coder-api-keys         (key `github-pat` -> GH_TOKEN/GITHUB_TOKEN)
+#
+# The chart grants this service account cluster-admin parity with the older
+# OpenClaw Coder runtime so Hermes can use kubectl for agent/debug tasks.
+#
+# Confirm Message Content + Server Members intents are ON in the Discord
+# Developer Portal for the Bclaws bot.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bclaws-hermes-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: bclaws-hermes-gateway
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: bclaws-hermes-gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://github.com/5dlabs/cto.git
+      targetRevision: main
+      path: infra/charts/hermes-gateway
+      helm:
+        releaseName: bclaws-hermes-gateway
+        valueFiles:
+          - ../../gitops/agents/bclaws-hermes-gateway-values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: "5s"
+        factor: 2
+        maxDuration: "3m"
