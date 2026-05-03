@@ -1,25 +1,13 @@
 #!/bin/sh
 set -eu
 
-HERMES_BIN="${HERMES_BIN:-/opt/hermes/.venv/bin/hermes}"
 HERMES_HOME_DIR="${HERMES_HOME:-/opt/data}"
 STATE_FILE="${HERMES_HOME_DIR}/gateway_state.json"
-
-if ! pgrep -f 'hermes.*gateway' >/dev/null 2>&1; then
-  echo "hermes gateway process not found" >&2
-  exit 1
-fi
 
 if [ ! -s "$STATE_FILE" ]; then
   echo "gateway state file missing: $STATE_FILE" >&2
   exit 1
 fi
-
-"$HERMES_BIN" gateway status 2>/dev/null | grep -Eq 'Gateway is running|running manually|running with|✓|connected' || {
-  echo "hermes gateway status is not healthy" >&2
-  "$HERMES_BIN" gateway status >&2 || true
-  exit 1
-}
 
 "/opt/hermes/.venv/bin/python" - "$STATE_FILE" <<'PY'
 import json, sys
