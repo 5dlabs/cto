@@ -1,0 +1,67 @@
+name: Hermes Presence Adapter – Build and Publish Docker Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/hermes-presence-adapter/**"
+      - ".github/workflows/hermes-presence-adapter-publish.yml"
+  pull_request:
+    paths:
+      - "apps/hermes-presence-adapter/**"
+      - ".github/workflows/hermes-presence-adapter-publish.yml"
+
+permissions:
+  contents: read
+  packages: write # for publishing to GitHub Container Registry
+
+defaults:
+  run:
+    working-directory: apps/hermes-presence-adapter
+
+jobs:
+  # ─── Test & Build (runs on PRs and pushes) ────────────────────────
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type-check and build
+        run: npm run build
+
+  # ─── Build and push Docker image to GHCR (main only) ──────────────
+  publish-docker:
+    name: Publish Docker Image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read package version
+        id: version
+        working-directory: apps/hermes-presence-adapter
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: hermes-presence-adapter
+          context: apps/hermes-presence-adapter
+          dockerfile: apps/hermes-presence-adapter/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ github.sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

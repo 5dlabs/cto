@@ -30,7 +30,7 @@ Each completed row should include:
 | Agent coordination | `NOT_STARTED` | Durable many-pod coordination plane not implemented. |
 | Memory/skills lifecycle | `NOT_STARTED` | Policy/tooling not implemented. |
 | OpenClaw/hosted | `NOT_STARTED` | Runtime type exists; adapters/examples and contract tests remain. |
-| Ops hardening | `NOT_STARTED` | Missing complete image workflow audit, runbook, scale/failure validation, and rollback docs. |
+| Ops hardening | `UNIT_PASS` | Workflow audit now confirms the existing Discord bridge publish workflow and a local Hermes adapter publish workflow candidate are syntax-valid; Hermes workflow still must land on `main` and publish successfully before final `PASS`. Missing runbook, scale/failure validation, and rollback docs remain. |
 
 ## Discord surfaces and input coverage
 
@@ -142,8 +142,8 @@ Each completed row should include:
 
 | ID | Use case | Status | Owner | Validation command/procedure | Expected result | Evidence |
 |---|---|---|---|---|---|---|
-| OPS-01 | Discord bridge image publish workflow verified | `NOT_STARTED` | TBD | Inspect workflow and latest successful run. | `ghcr.io/5dlabs/discord-bridge` publishes reliably with durable tags. | TBD |
-| OPS-02 | Hermes presence adapter image publish workflow verified | `NOT_STARTED` | TBD | Inspect/add workflow and latest successful run. | `ghcr.io/5dlabs/hermes-presence-adapter` publishes reliably with durable tags. | TBD |
+| OPS-01 | Discord bridge image publish workflow verified | `PASS` | control-plane loop | `2026-05-03T21:35Z` inspected `.github/workflows/discord-bridge-publish.yml`, `.github/actions/docker-build-push/action.yaml`, ran YAML parse check, and `gh run list --workflow discord-bridge-publish.yml --limit 5 --json ...`. | Workflow is on `main`; latest push run for `85ee0d503f8c5a88f525b5310b55c0550a16bdfa` completed `success` on 2026-04-30. Tags include `latest`, `v<package.version>`, and commit SHA through the shared Docker action. | GitHub Actions run `25163643005`; no secrets printed. |
+| OPS-02 | Hermes presence adapter image publish workflow verified | `UNIT_PASS` | control-plane loop | `2026-05-03T21:35Z` inspected local `.github/workflows/hermes-presence-adapter-publish.yml`, `.github/actions/docker-build-push/action.yaml`, and ran YAML parse check. `gh run list --workflow hermes-presence-adapter-publish.yml` returned HTTP 404 because the workflow is not yet present on `origin/main`. | Workflow candidate mirrors the Discord bridge publish path: PR/push test+build, main-only GHCR publish, and `latest`/`v0.1.0`/SHA tags via the shared Docker action. | Needs commit/merge and first successful Actions run before `PASS`; no secrets printed. |
 | OPS-03 | GitOps manifests pin production images | `NOT_STARTED` | TBD | Inspect Helm/manifests values. | Production paths avoid unreviewed `latest` drift where possible. | TBD |
 | OPS-04 | ArgoCD apps healthy after rollout | `NOT_STARTED` | TBD | Inspect ArgoCD/app health. | Apps are synced and healthy. | TBD |
 | OPS-05 | Redacted route/register/delete/delivery logs | `NOT_STARTED` | TBD | Exercise route lifecycle and inspect logs. | Logs include useful route/runtime metadata and no secrets. | TBD |
