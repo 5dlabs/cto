@@ -27,7 +27,7 @@ Each completed row should include:
 | Discord surfaces | `UNIT_PASS` | Bridge unit coverage now validates normalization, mention selection, shared-channel fail-closed behavior, thread parent/thread preservation, and thread-vs-parent home-route precedence. Live Discord DM/guild/private/thread/attachment evidence remains. |
 | Hermes ingress/outbound/session | `UNIT_PASS` | Hermes adapter unit coverage now validates authenticated inbound delivery, metadata validation, deterministic session/home/route metadata forwarding, and outbound status intent posting. Real CodeRun E2E and live session/home validation remain. |
 | Morgan sidecar/MCP | `BLOCKED` | Design exists; sidecar/MCP implementation and repo/image decision are missing. |
-| Agent coordination | `NOT_STARTED` | Durable many-pod coordination plane not implemented. |
+| Agent coordination | `UNIT_PASS` | Wave 2A runtime-neutral envelope/addressing contract and pure TypeScript helper skeleton are documented and unit-tested; durable registry/inbox/service implementation remains. |
 | Memory/skills lifecycle | `NOT_STARTED` | Policy/tooling not implemented. |
 | OpenClaw/hosted | `NOT_STARTED` | Runtime type exists; adapters/examples and contract tests remain. |
 | Ops hardening | `UNIT_PASS` | Workflow audit now confirms the existing Discord bridge publish workflow and a local Hermes adapter publish workflow candidate are syntax-valid; Hermes workflow still must land on `main` and publish successfully before final `PASS`. Missing runbook, scale/failure validation, and rollback docs remain. |
@@ -97,7 +97,7 @@ Each completed row should include:
 
 | ID | Use case | Status | Owner | Validation command/procedure | Expected result | Evidence |
 |---|---|---|---|---|---|---|
-| C-01 | Coordination contract documented | `NOT_STARTED` | TBD | Review design doc under `docs/2026-04/design/`. | Agent identity, routes, groups, envelopes, delivery targets, and human contact request are specified. | TBD |
+| C-01 | Coordination contract documented | `UNIT_PASS` | control-plane loop | `2026-05-03T22:00Z npm test` in `apps/agent-coordination-plane` (`6/6` pass) plus `npm run build`; reviewed `docs/2026-04/design/agent-coordination-plane.md`. | Agent identity, routes, groups, envelopes, delivery targets, and human contact request are specified. | Wave 2A spec and helper skeleton cover identity/address/message/envelope and subject mapping; human-contact policy endpoint still requires the service/MCP wave before final `PASS`. |
 | C-02 | Agent registration API | `NOT_STARTED` | TBD | Register two disposable Hermes agents. | Directory stores agent identity, project/task/coderun/role metadata, expiry. | TBD |
 | C-03 | Project group routing | `NOT_STARTED` | TBD | Broadcast to project group. | All project members receive durable message. | TBD |
 | C-04 | Task group routing | `NOT_STARTED` | TBD | Broadcast to task group. | All task members receive durable message. | TBD |
