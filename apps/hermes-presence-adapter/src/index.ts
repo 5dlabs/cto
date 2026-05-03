@@ -34,6 +34,15 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+function isStringMap(value: unknown): value is Record<string, string> {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.values(value).every((item) => typeof item === "string"),
+  );
+}
+
 function validateInbound(payload: unknown): PresenceInbound {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("payload must be an object");
@@ -44,6 +53,9 @@ function validateInbound(payload: unknown): PresenceInbound {
   if (!event.agent_id) throw new Error("agent_id is required");
   if (!event.discord?.account_id || !event.discord.channel_id) {
     throw new Error("discord.account_id and discord.channel_id are required");
+  }
+  if (event.metadata !== undefined && !isStringMap(event.metadata)) {
+    throw new Error("metadata must be a string map");
   }
   return event as PresenceInbound;
 }

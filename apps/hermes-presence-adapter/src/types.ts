@@ -61,6 +61,9 @@ export interface HermesRunRequest {
     user_id?: string;
     user_name?: string;
     thread_id?: string;
+    home_id?: string;
+    home_route_id?: string;
+    route_id?: string;
   };
 }
 

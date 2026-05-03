@@ -64,13 +64,15 @@ export interface PresenceRoute {
   coderun_id?: string;
   discord?: Partial<PresenceDiscordContext>;
   session_key?: string;
+  metadata?: Record<string, string>;
   created_at?: string;
   updated_at?: string;
 }
 
+type ValidationError = { ok: false; error: string };
 export type ValidationResult<T> =
   | { ok: true; value: T }
-  | { ok: false; error: string };
+  | ValidationError;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -84,6 +86,17 @@ function stringField(obj: Record<string, unknown>, key: string): string | undefi
 function optionalStringField(obj: Record<string, unknown>, key: string): string | undefined {
   const value = obj[key];
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function stringMapField(obj: Record<string, unknown>, key: string): ValidationResult<Record<string, string> | undefined> {
+  const value = obj[key];
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+  if (!isRecord(value) || !Object.values(value).every((item) => typeof item === "string")) {
+    return { ok: false, error: `${key} must be a string map` };
+  }
+  return { ok: true, value: value as Record<string, string> };
 }
 
 function isPresenceRuntime(value: unknown): value is PresenceRuntime {
@@ -141,7 +154,7 @@ export function validatePresenceDiscordEvent(payload: unknown): ValidationResult
     return { ok: false, error: "event_type must be message, interaction, thread, or lifecycle" };
   }
   const discord = validateDiscordContext(payload.discord);
-  if (!discord.ok) {
+  if (discord.ok === false) {
     return { ok: false, error: discord.error };
   }
 
@@ -151,6 +164,11 @@ export function validatePresenceDiscordEvent(payload: unknown): ValidationResult
     (!Array.isArray(attachments) || !attachments.every((item) => isRecord(item) && typeof item.url === "string"))
   ) {
     return { ok: false, error: "attachments must be an array of objects with url" };
+  }
+
+  const metadata = stringMapField(payload, "metadata");
+  if (metadata.ok === false) {
+    return { ok: false, error: metadata.error };
   }
 
   return {
@@ -165,7 +183,7 @@ export function validatePresenceDiscordEvent(payload: unknown): ValidationResult
       discord: discord.value,
       text: optionalStringField(payload, "text"),
       attachments: attachments as PresenceAttachment[] | undefined,
-      metadata: isRecord(payload.metadata) ? (payload.metadata as Record<string, string>) : undefined,
+      metadata: metadata.value,
     },
   };
 }
@@ -188,7 +206,7 @@ export function validatePresenceInbound(payload: unknown): ValidationResult<Pres
     return { ok: false, error: "agent_id is required" };
   }
   const discord = validateDiscordContext(payload.discord);
-  if (!discord.ok) {
+  if (discord.ok === false) {
     return { ok: false, error: discord.error };
   }
 
@@ -198,6 +216,11 @@ export function validatePresenceInbound(payload: unknown): ValidationResult<Pres
     (!Array.isArray(attachments) || !attachments.every((item) => isRecord(item) && typeof item.url === "string"))
   ) {
     return { ok: false, error: "attachments must be an array of objects with url" };
+  }
+
+  const metadata = stringMapField(payload, "metadata");
+  if (metadata.ok === false) {
+    return { ok: false, error: metadata.error };
   }
 
   return {
@@ -213,7 +236,7 @@ export function validatePresenceInbound(payload: unknown): ValidationResult<Pres
       discord: discord.value,
       text: optionalStringField(payload, "text"),
       attachments: attachments as PresenceAttachment[] | undefined,
-      metadata: isRecord(payload.metadata) ? (payload.metadata as Record<string, string>) : undefined,
+      metadata: metadata.value,
     },
   };
 }
@@ -234,6 +257,11 @@ export function validatePresenceRoute(payload: unknown): ValidationResult<Presen
     optionalStringField(payload, "coderun_id") ??
     `${payload.runtime}:${agentId}:${Date.now()}`;
 
+  const metadata = stringMapField(payload, "metadata");
+  if (metadata.ok === false) {
+    return { ok: false, error: metadata.error };
+  }
+
   return {
     ok: true,
     value: {
@@ -246,6 +274,7 @@ export function validatePresenceRoute(payload: unknown): ValidationResult<Presen
       coderun_id: optionalStringField(payload, "coderun_id"),
       discord: isRecord(payload.discord) ? (payload.discord as Partial<PresenceDiscordContext>) : undefined,
       session_key: optionalStringField(payload, "session_key"),
+      metadata: metadata.value,
     },
   };
 }
