@@ -1,0 +1,8 @@
+# Disabled intentionally: the regular Coder Discord bot is owned by the
+# OpenClaw/Hermes coder StatefulSet (`openclaw-hermes-coder`). Running this
+# legacy upstream Hermes gateway with the same Discord bot token creates two
+# Discord gateway sessions for Coder#3336; Discord then closes one of the
+# sessions (observed close code 1006), making Coder intermittently disappear
+# from Discord while Kubernetes still reports both workloads healthy.
+enabled: false
+disableReason: "legacy Coder gateway disabled; openclaw-hermes-coder owns Coder#3336"

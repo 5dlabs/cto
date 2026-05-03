@@ -1,6 +1,6 @@
 # Default values for hermes-gateway.
-# This chart deploys upstream nousresearch/hermes-agent as the single
-# production Discord process for Coder.
+# This chart deploys upstream nousresearch/hermes-agent as a production Discord
+# process. Only one workload may use a given Discord bot token at a time.
 
 nameOverride: ""
 fullnameOverride: ""
@@ -24,10 +24,15 @@ args:
     exec /opt/hermes/docker/entrypoint.sh hermes --yolo --accept-hooks gateway run --accept-hooks
 
 # HERMES_HOME - upstream image expects state at /opt/data.
+enabled: true
+# Optional safety guard: set `disableReason` to a non-empty string to render no
+# workload for this release while keeping the Argo app/chart source-owned.
+disableReason: ""
+
 statefulset:
   # StatefulSet mode gives each bot a stable pod identity and durable per-pod
-  # volume claim. Leave disabled for the existing Coder deployment to avoid
-  # changing its PVC name/kind in place; enable for new bots such as Bclaws.
+  # volume claim. Leave disabled for existing Deployment-backed bots to avoid
+  # changing PVC name/kind in place; enable for new bots such as Bclaws.
   enabled: false
 
 persistence:

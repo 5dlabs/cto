@@ -1,3 +1,4 @@
+{{- if .Values.enabled }}
 apiVersion: apps/v1
 {{- if .Values.statefulset.enabled }}
 kind: StatefulSet
@@ -349,3 +350,4 @@ spec:
         storageClassName: {{ .Values.persistence.storageClassName | quote }}
         {{- end }}
   {{- end }}
+{{- end }}
