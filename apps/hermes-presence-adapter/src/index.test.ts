@@ -261,6 +261,13 @@ test("forwards Discord reply reference metadata to Hermes input", async () => {
     inbound.discord.reference_message_id = "source-message-1";
     inbound.discord.reference_channel_id = "source-channel-1";
     inbound.discord.reference_guild_id = "guild-1";
+    inbound.discord.mentioned_agent_ids = ["123456789012345678", "rex"];
+    inbound.metadata = {
+      selected_agent_id: "rex",
+      selection_reason: "discord_mention",
+      mentioned_agent_ids: "123456789012345678,rex",
+      route_id: "mention-route",
+    };
 
     const response = await fetch(`${adapterUrl}/presence/inbound`, {
       method: "POST",
@@ -272,6 +279,9 @@ test("forwards Discord reply reference metadata to Hermes input", async () => {
     assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_message_id, "source-message-1");
     assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_channel_id, "source-channel-1");
     assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_guild_id, "guild-1");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.selected_agent_id, "rex");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.selection_reason, "discord_mention");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.mentioned_agent_ids, "123456789012345678,rex");
   } finally {
     await close(adapterServer);
     await close(hermesServer);

@@ -96,6 +96,35 @@ function routeDiscordScore(route: PresenceRoute, event: PresenceDiscordEvent): n
   return score;
 }
 
+function selectionMetadata(event: PresenceDiscordEvent, route: PresenceRoute): Record<string, string> {
+  if (event.agent_id) {
+    return {
+      selected_agent_id: route.agent_id,
+      selection_reason: "event_agent_id",
+    };
+  }
+
+  if (event.discord.mentioned_agent_ids?.length) {
+    return {
+      selected_agent_id: route.agent_id,
+      selection_reason: "discord_mention",
+      mentioned_agent_ids: event.discord.mentioned_agent_ids.join(","),
+    };
+  }
+
+  if (isHomeRoute(route)) {
+    return {
+      selected_agent_id: route.agent_id,
+      selection_reason: "home_route",
+    };
+  }
+
+  return {
+    selected_agent_id: route.agent_id,
+    selection_reason: "route_match",
+  };
+}
+
 function eventForRoute(event: PresenceDiscordEvent, route: PresenceRoute): PresenceInbound {
   const sessionKey = route.session_key ?? stableSurfaceSessionKey(event.discord);
   return {
@@ -108,6 +137,7 @@ function eventForRoute(event: PresenceDiscordEvent, route: PresenceRoute): Prese
     metadata: {
       ...(route.metadata ?? {}),
       ...(event.metadata ?? {}),
+      ...selectionMetadata(event, route),
       route_id: route.route_id,
     },
     session_key: sessionKey,

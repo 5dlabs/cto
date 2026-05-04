@@ -33,8 +33,8 @@ function buildHermesRun(event: PresenceInbound): HermesRunRequest {
       discord_reference_message_id: event.discord.reference_message_id ?? "",
       discord_reference_channel_id: event.discord.reference_channel_id ?? "",
       discord_reference_guild_id: event.discord.reference_guild_id ?? "",
-      session_key: event.session_key ?? "",
       ...(event.metadata ?? {}),
+      session_key: event.session_key ?? "",
     },
     session: {
       platform: "discord",

@@ -252,6 +252,9 @@ test("normalized mention messages route to non-default mentioned agents", async 
 
       assert.equal(result.deliveries.length, 1);
       assert.equal((delivered[0] as PresenceInbound).agent_id, "rex");
+      assert.equal((delivered[0] as PresenceInbound).metadata?.selected_agent_id, "rex");
+      assert.equal((delivered[0] as PresenceInbound).metadata?.selection_reason, "discord_mention");
+      assert.equal((delivered[0] as PresenceInbound).metadata?.mentioned_agent_ids, "rex");
     },
   );
 });

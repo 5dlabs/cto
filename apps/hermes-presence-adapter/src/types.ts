@@ -19,6 +19,7 @@ export interface PresenceInbound {
     user_name?: string;
     chat_type?: "dm" | "group" | "thread";
     parent_channel_id?: string;
+    mentioned_agent_ids?: string[];
   };
   text?: string;
   attachments?: Array<{ id?: string; url: string; content_type?: string; filename?: string; size?: number; spoiler?: boolean }>;
