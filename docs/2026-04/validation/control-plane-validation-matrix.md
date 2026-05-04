@@ -28,7 +28,7 @@ Each completed row should include:
 | Hermes ingress/outbound/session | `UNIT_PASS` | Hermes adapter unit coverage now validates authenticated inbound delivery, metadata validation, deterministic session/home/route metadata forwarding, and outbound status intent posting. The Hermes CodeRun smoke harness now has local Python syntax coverage and dry-run manifest/payload rendering evidence; live CodeRun E2E and live session/home validation remain. |
 | Morgan sidecar/MCP | `BLOCKED` | Design exists; sidecar/MCP implementation and repo/image decision are missing. |
 | Agent coordination | `UNIT_PASS` | Wave 2A runtime-neutral envelope/addressing contract and pure TypeScript helper skeleton are documented and unit-tested; validators now reject unknown message/runtime/address enums before transport adapters trust payloads. Durable registry/inbox/service implementation remains. |
-| Memory/skills lifecycle | `NOT_STARTED` | Policy/tooling not implemented. |
+| Memory/skills lifecycle | `UNIT_PASS` | Morgan memory/skills lifecycle policy is now documented with scoped runtime/workspace/OpenMemory layers, retention guardrails, remote skill-source rules, lifecycle states, and pinned-core protections. Implementation and live policy enforcement remain. |
 | OpenClaw/hosted | `NOT_STARTED` | Runtime type exists; adapters/examples and contract tests remain. |
 | Ops hardening | `UNIT_PASS` | Workflow audit now confirms the existing Discord bridge publish workflow and a local Hermes adapter publish workflow candidate are syntax-valid; Hermes workflow still must land on `main` and publish successfully before final `PASS`. Operator runbook/rollback skeleton now exists; live scale/failure validation and redacted diagnostics remain. |
 
@@ -112,7 +112,7 @@ Each completed row should include:
 
 | ID | Use case | Status | Owner | Validation command/procedure | Expected result | Evidence |
 |---|---|---|---|---|---|---|
-| MS-01 | Morgan memory/skills policy documented | `NOT_STARTED` | TBD | Review policy doc. | Memory scopes and skill lifecycle rules are explicit. | TBD |
+| MS-01 | Morgan memory/skills policy documented | `UNIT_PASS` | control-plane loop | `2026-05-04T00:00:49Z` reviewed `docs/2026-04/design/morgan-memory-skills-policy.md`; policy defines runtime streams vs workspace session memory vs OpenMemory, startup/during-run/completion retrieval rules, remote skills/persona source-of-truth, lifecycle states (`active`, `stale`, `archived`, `pinned`), and pinned-core protection. `git diff --check` passed for this docs-only evidence update. | Memory scopes and skill lifecycle rules are explicit enough to unblock implementation design. | Tooling/enforcement for project-scoped retrieve, lifecycle transitions, and pinned protection still required before final `PASS`. |
 | MS-02 | Project-scoped memory retrieve | `NOT_STARTED` | TBD | Store Project A memory; query from Project A. | Relevant memory is retrievable. | TBD |
 | MS-03 | Cross-project memory bleed prevention | `NOT_STARTED` | TBD | Store Project A memory; query from Project B. | Memory is not returned unless explicit policy elevation allows. | TBD |
 | MS-04 | Meeting transcript summarization before durable write | `NOT_STARTED` | TBD | Process controlled transcript. | Only summarized/provenanced facts are written durably. | TBD |
