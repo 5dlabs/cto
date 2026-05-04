@@ -90,6 +90,25 @@ test("normalizes Discord reply reference metadata", () => {
   assert.equal(event?.discord.reference_guild_id, "guild-1");
 });
 
+test("preserves empty text for attachment-only Discord messages", () => {
+  const event = normalizeDiscordMessage(message({ content: "" }), {
+    accountId: "coder-control",
+    defaultAgentId: "coder",
+  });
+
+  assert.equal(event?.text, "");
+  assert.deepEqual(event?.attachments, [
+    {
+      id: "att-1",
+      url: "https://cdn.example/file.png",
+      content_type: "image/png",
+      filename: "file.png",
+      size: 12345,
+      spoiler: true,
+    },
+  ]);
+});
+
 test("ignores bot-authored messages", () => {
   const event = normalizeDiscordMessage(message({ author: { id: "bot-author", username: "bot", bot: true } }), {
     accountId: "coder-control",

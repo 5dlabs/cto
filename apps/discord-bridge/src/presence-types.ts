@@ -91,7 +91,7 @@ function stringField(obj: Record<string, unknown>, key: string): string | undefi
 
 function optionalStringField(obj: Record<string, unknown>, key: string): string | undefined {
   const value = obj[key];
-  return typeof value === "string" && value.trim() ? value : undefined;
+  return typeof value === "string" ? value : undefined;
 }
 
 function stringMapField(obj: Record<string, unknown>, key: string): ValidationResult<Record<string, string> | undefined> {

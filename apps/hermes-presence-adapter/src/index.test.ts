@@ -277,3 +277,46 @@ test("forwards Discord reply reference metadata to Hermes input", async () => {
     await close(hermesServer);
   }
 });
+
+test("forwards attachment-only Discord messages to Hermes input with placeholder text", async () => {
+  const hermesRequests: unknown[] = [];
+  const hermesServer = createServer((req, res) => {
+    void (async () => {
+      hermesRequests.push(await readJson(req));
+      res.writeHead(202, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ id: "run-1", status: "accepted" }));
+    })();
+  });
+  const hermesUrl = await listen(hermesServer);
+  const adapterServer = createAdapterServer(config({ hermesInputUrl: `${hermesUrl}/input` }));
+  const adapterUrl = await listen(adapterServer);
+  try {
+    const inbound = event();
+    inbound.text = "";
+    inbound.attachments = [
+      {
+        id: "att-1",
+        url: "https://cdn.example/file.png",
+        content_type: "image/png",
+        filename: "file.png",
+        size: 12345,
+        spoiler: true,
+      },
+    ];
+
+    const response = await fetch(`${adapterUrl}/presence/inbound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer shared-token" },
+      body: JSON.stringify(inbound),
+    });
+
+    assert.equal(response.status, 202);
+    assert.equal(
+      (hermesRequests[0] as { input: string }).input,
+      "(The user sent a message with no text content)\n\nAttachments:\n- file.png: https://cdn.example/file.png",
+    );
+  } finally {
+    await close(adapterServer);
+    await close(hermesServer);
+  }
+});

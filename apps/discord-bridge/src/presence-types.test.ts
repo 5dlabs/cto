@@ -46,6 +46,21 @@ test("rejects non-string metadata values on worker inbound events", () => {
   }
 });
 
+test("accepts empty text on attachment-only normalized Discord events", () => {
+  const result = validatePresenceDiscordEvent({
+    schema: "cto.presence.v1",
+    event_type: "message",
+    discord: { account_id: "discord-bot", channel_id: "channel-1" },
+    text: "",
+    attachments: [{ url: "https://cdn.example/file.png" }],
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.text, "");
+  }
+});
+
 test("rejects malformed attachments on normalized Discord events", () => {
   const result = validatePresenceDiscordEvent({
     schema: "cto.presence.v1",
