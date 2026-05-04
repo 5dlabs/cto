@@ -2,7 +2,7 @@
 
 Timestamp: 2026-05-04T02:02:40Z
 
-Heartbeat refresh: 2026-05-04T02:26:34Z
+Heartbeat refresh: 2026-05-04T02:51:35Z
 
 ## Purpose
 
@@ -33,15 +33,29 @@ Refreshed state at 2026-05-04T02:26:34Z after this note itself was committed and
 ?? .hermes/
 ```
 
+Refreshed state at 2026-05-04T02:51:35Z after `git fetch origin main --prune` and the safety-branch push:
+
+```text
+## main...origin/main [ahead 14, behind 16]
+?? .hermes/
+```
+
 A safety branch was created locally at the current stack tip before rebase/force-push surgery:
 
 ```text
 control-plane-presence-hardening-2026-05-04
 ```
 
+The safety branch was pushed to origin in the 2026-05-04T02:51Z heartbeat without rebasing or force-pushing local `main`:
+
+```text
+origin/control-plane-presence-hardening-2026-05-04
+```
+
 Local-only commits not on `origin/main`:
 
 ```text
+3fb33da6 docs(control-plane): refresh reconciliation safety branch evidence
 da69ed87 docs(control-plane): record branch reconciliation handoff
 ede6c98c test(presence): propagate addressing provenance
 ec748efc test(control-plane): preserve attachment-only Discord text
@@ -90,7 +104,7 @@ remote_count 48
 overlap_count 0
 ```
 
-Interpretation: the divergent stacks currently touch disjoint paths. The local stack is mostly presence contract hardening, validation docs/smoke harnesses, the Hermes adapter publish workflow, the isolated agent coordination skeleton, and this reconciliation note. The remote stack is mostly intake/ACPX work plus Hermes gateway/GitOps fixes. This should make reconciliation relatively low-conflict, but it still needs an explicit human- or PR-reviewed rebase/merge because the local branch name is `main` and is 13 commits ahead of the remote default branch.
+Interpretation: the divergent stacks currently touch disjoint paths. The local stack is mostly presence contract hardening, validation docs/smoke harnesses, the Hermes adapter publish workflow, the isolated agent coordination skeleton, and this reconciliation note. The remote stack is mostly intake/ACPX work plus Hermes gateway/GitOps fixes. This should make reconciliation relatively low-conflict, but it still needs an explicit human- or PR-reviewed rebase/merge because the local branch name is `main` and is 14 commits ahead of the remote default branch.
 
 ## Local-only changed artifact groups
 
@@ -147,18 +161,25 @@ Completed in the 2026-05-04T02:26Z heartbeat:
 - Re-ran merge-base/path-overlap analysis after fetch: local 30 paths, remote 48 paths, overlap 0.
 - Re-ran GitHub PR checks: no open PR for local `main`; search still found only unrelated release/dependabot style PRs.
 
+Completed in the 2026-05-04T02:51Z heartbeat:
+
+- Pushed safety branch `origin/control-plane-presence-hardening-2026-05-04` so the divergent stack now has a remote handoff point.
+- Re-ran branch-state inspection: local `main` is ahead 14 / behind 16; no open PR exists for `main`, and the only open control-plane/presence search hit remains unrelated release PR #4896.
+- Re-ran merge-base/path-overlap analysis after fetch: local 30 paths, remote 48 paths, overlap 0.
+- Re-ran no-mutation antenna checks: `git diff --check`, Python smoke harness `py_compile`, Hermes CodeRun smoke dry-run, and package-scoped tests/builds for `apps/discord-bridge`, `apps/hermes-presence-adapter`, and `apps/agent-coordination-plane` all passed.
+
 Remaining safe sequence:
 
-1. Push the safety branch or create an explicitly named PR branch from it rather than pushing local `main` directly.
-2. Rebase that branch onto `origin/main` or merge `origin/main` into it, preserving the 13 local commits as reviewable chunks.
-3. Rerun package-scoped validation:
+1. Open a PR from `control-plane-presence-hardening-2026-05-04` or create a PR branch derived from it; do not push local `main` directly.
+2. Rebase that branch onto `origin/main` or merge `origin/main` into it, preserving the 14 local commits as reviewable chunks.
+3. Rerun package-scoped validation after reconciliation:
    - `git diff --check`
    - `python3 -m py_compile scripts/presence-smoke-hermes-coderun.py scripts/presence-morgan-task-smoke.py`
    - `python3 scripts/presence-smoke-hermes-coderun.py --mode dry-run`
    - `cd apps/discord-bridge && npm test && npm run build`
    - `cd apps/hermes-presence-adapter && npm test && npm run build`
    - `cd apps/agent-coordination-plane && npm test && npm run build`
-4. Open a PR against `main` with this reconciliation note, the validation matrix, and the smoke/runbook docs as the evidence handoff.
+4. Open/update the PR against `main` with this reconciliation note, the validation matrix, and the smoke/runbook docs as the evidence handoff.
 
 ## Live validation blocker observed in this heartbeat
 
