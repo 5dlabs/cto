@@ -12,6 +12,27 @@ metadata:
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cto-hermes-coder-control
+  labels:
+    app.kubernetes.io/name: hermes-gateway
+    app.kubernetes.io/instance: cto-hermes-coder-control
+    app.kubernetes.io/component: control-plane-builder
+    app.kubernetes.io/part-of: cto-platform
+rules:
+  # The builder heartbeat runs inside this service account and needs the same
+  # cluster inspection/mutation surface as the production Hermes gateway so it
+  # can validate GitOps, create temporary CodeRuns/pods, and run redacted smoke
+  # checks without depending on an external ClusterRole name.
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+  - nonResourceURLs: ["*"]
+    verbs: ["*"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: cto-hermes-coder-control
@@ -23,7 +44,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cto-hermes-gateway
+  name: cto-hermes-coder-control
 subjects:
   - kind: ServiceAccount
     name: cto-hermes-coder-control
