@@ -18,6 +18,9 @@ export interface PresenceDiscordContext {
   channel_id: string;
   thread_id?: string;
   message_id?: string;
+  reference_message_id?: string;
+  reference_channel_id?: string;
+  reference_guild_id?: string;
   user_id?: string;
   user_name?: string;
   chat_type?: PresenceChatType;
@@ -159,6 +162,9 @@ function validateDiscordContext(value: unknown): ValidationResult<PresenceDiscor
       guild_id: optionalStringField(value, "guild_id"),
       thread_id: optionalStringField(value, "thread_id"),
       message_id: optionalStringField(value, "message_id"),
+      reference_message_id: optionalStringField(value, "reference_message_id"),
+      reference_channel_id: optionalStringField(value, "reference_channel_id"),
+      reference_guild_id: optionalStringField(value, "reference_guild_id"),
       user_id: optionalStringField(value, "user_id"),
       user_name: optionalStringField(value, "user_name"),
       chat_type: chatType as PresenceChatType | undefined,

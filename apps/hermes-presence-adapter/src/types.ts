@@ -12,6 +12,9 @@ export interface PresenceInbound {
     channel_id: string;
     thread_id?: string;
     message_id?: string;
+    reference_message_id?: string;
+    reference_channel_id?: string;
+    reference_guild_id?: string;
     user_id?: string;
     user_name?: string;
     chat_type?: "dm" | "group" | "thread";

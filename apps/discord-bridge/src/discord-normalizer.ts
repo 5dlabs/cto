@@ -43,6 +43,11 @@ interface DiscordLikeMessage {
     users?: unknown;
   };
   attachments?: unknown;
+  reference?: {
+    messageId?: string | null;
+    channelId?: string | null;
+    guildId?: string | null;
+  } | null;
 }
 
 function valuesFromCollection<T>(collection: unknown): T[] {
@@ -117,6 +122,9 @@ export function normalizeDiscordMessage(
       channel_id: channelId,
       thread_id: isThread ? rawChannelId : undefined,
       message_id: message.id,
+      reference_message_id: message.reference?.messageId ?? undefined,
+      reference_channel_id: message.reference?.channelId ?? undefined,
+      reference_guild_id: message.reference?.guildId ?? undefined,
       user_id: message.author?.id,
       user_name: authorName,
       chat_type: isDm ? "dm" : isThread ? "thread" : "group",

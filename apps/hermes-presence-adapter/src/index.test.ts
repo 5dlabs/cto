@@ -178,6 +178,9 @@ test("posts non-fatal presence status intents and sends Hermes input payloads", 
           discord_channel_id: "channel-1",
           discord_thread_id: "thread-1",
           discord_message_id: "message-1",
+          discord_reference_message_id: "",
+          discord_reference_channel_id: "",
+          discord_reference_guild_id: "",
           session_key: "",
         },
         session: {
@@ -235,6 +238,40 @@ test("forwards deterministic session and home route metadata to Hermes input", a
       home_route_id: "thread-home",
       route_id: "thread-home",
     });
+  } finally {
+    await close(adapterServer);
+    await close(hermesServer);
+  }
+});
+
+test("forwards Discord reply reference metadata to Hermes input", async () => {
+  const hermesRequests: unknown[] = [];
+  const hermesServer = createServer((req, res) => {
+    void (async () => {
+      hermesRequests.push(await readJson(req));
+      res.writeHead(202, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ id: "run-1", status: "accepted" }));
+    })();
+  });
+  const hermesUrl = await listen(hermesServer);
+  const adapterServer = createAdapterServer(config({ hermesInputUrl: `${hermesUrl}/input` }));
+  const adapterUrl = await listen(adapterServer);
+  try {
+    const inbound = event();
+    inbound.discord.reference_message_id = "source-message-1";
+    inbound.discord.reference_channel_id = "source-channel-1";
+    inbound.discord.reference_guild_id = "guild-1";
+
+    const response = await fetch(`${adapterUrl}/presence/inbound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer shared-token" },
+      body: JSON.stringify(inbound),
+    });
+
+    assert.equal(response.status, 202);
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_message_id, "source-message-1");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_channel_id, "source-channel-1");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_guild_id, "guild-1");
   } finally {
     await close(adapterServer);
     await close(hermesServer);

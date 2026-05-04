@@ -73,6 +73,23 @@ test("normalizes thread messages with parent channel id", () => {
   assert.equal(event?.discord.chat_type, "thread");
 });
 
+test("normalizes Discord reply reference metadata", () => {
+  const event = normalizeDiscordMessage(
+    message({
+      reference: {
+        messageId: "source-message-1",
+        channelId: "source-channel-1",
+        guildId: "guild-1",
+      },
+    }),
+    { accountId: "coder-control", defaultAgentId: "coder" },
+  );
+
+  assert.equal(event?.discord.reference_message_id, "source-message-1");
+  assert.equal(event?.discord.reference_channel_id, "source-channel-1");
+  assert.equal(event?.discord.reference_guild_id, "guild-1");
+});
+
 test("ignores bot-authored messages", () => {
   const event = normalizeDiscordMessage(message({ author: { id: "bot-author", username: "bot", bot: true } }), {
     accountId: "coder-control",
