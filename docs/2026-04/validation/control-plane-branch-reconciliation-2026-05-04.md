@@ -2,6 +2,8 @@
 
 Timestamp: 2026-05-04T02:02:40Z
 
+Heartbeat refresh: 2026-05-04T02:26:34Z
+
 ## Purpose
 
 Capture the mergeability/evidence handoff state for the local CTO Discord control-plane work-loop without doing broad rebase or force-push surgery from the autonomous heartbeat.
@@ -17,16 +19,30 @@ git log --oneline HEAD..origin/main
 git log --oneline origin/main..HEAD
 ```
 
-Observed state:
+Observed state at 2026-05-04T02:02:40Z:
 
 ```text
 ## main...origin/main [ahead 12, behind 16]
 ?? .hermes/
 ```
 
+Refreshed state at 2026-05-04T02:26:34Z after this note itself was committed and `git fetch origin main --prune` was rerun:
+
+```text
+## main...origin/main [ahead 13, behind 16]
+?? .hermes/
+```
+
+A safety branch was created locally at the current stack tip before rebase/force-push surgery:
+
+```text
+control-plane-presence-hardening-2026-05-04
+```
+
 Local-only commits not on `origin/main`:
 
 ```text
+da69ed87 docs(control-plane): record branch reconciliation handoff
 ede6c98c test(presence): propagate addressing provenance
 ec748efc test(control-plane): preserve attachment-only Discord text
 ad287af0 docs(control-plane): reconcile smoke and roadmap artifacts
@@ -69,12 +85,12 @@ Merge base: `85ee0d503f8c` (`feat: add runtime-neutral Discord presence control 
 A path-overlap check between `85ee0d503f8c..HEAD` and `85ee0d503f8c..origin/main` found:
 
 ```text
-local_count 29
+local_count 30
 remote_count 48
 overlap_count 0
 ```
 
-Interpretation: the divergent stacks currently touch disjoint paths. The local stack is mostly presence contract hardening, validation docs/smoke harnesses, the Hermes adapter publish workflow, and the isolated agent coordination skeleton. The remote stack is mostly intake/ACPX work plus Hermes gateway/GitOps fixes. This should make reconciliation relatively low-conflict, but it still needs an explicit human- or PR-reviewed rebase/merge because the local branch name is `main` and is 12 commits ahead of the remote default branch.
+Interpretation: the divergent stacks currently touch disjoint paths. The local stack is mostly presence contract hardening, validation docs/smoke harnesses, the Hermes adapter publish workflow, the isolated agent coordination skeleton, and this reconciliation note. The remote stack is mostly intake/ACPX work plus Hermes gateway/GitOps fixes. This should make reconciliation relatively low-conflict, but it still needs an explicit human- or PR-reviewed rebase/merge because the local branch name is `main` and is 13 commits ahead of the remote default branch.
 
 ## Local-only changed artifact groups
 
@@ -125,8 +141,16 @@ Search for open PRs with `control plane OR presence OR discord bridge OR hermes 
 
 ## Recommended next safe action
 
-1. Create a dedicated branch from the local stack before any surgery, for example `control-plane-presence-hardening-2026-05-04`.
-2. Rebase that branch onto `origin/main` or merge `origin/main` into it, preserving the 12 local commits as reviewable chunks.
+Completed in the 2026-05-04T02:26Z heartbeat:
+
+- Created local safety branch `control-plane-presence-hardening-2026-05-04` at the divergent stack tip.
+- Re-ran merge-base/path-overlap analysis after fetch: local 30 paths, remote 48 paths, overlap 0.
+- Re-ran GitHub PR checks: no open PR for local `main`; search still found only unrelated release/dependabot style PRs.
+
+Remaining safe sequence:
+
+1. Push the safety branch or create an explicitly named PR branch from it rather than pushing local `main` directly.
+2. Rebase that branch onto `origin/main` or merge `origin/main` into it, preserving the 13 local commits as reviewable chunks.
 3. Rerun package-scoped validation:
    - `git diff --check`
    - `python3 -m py_compile scripts/presence-smoke-hermes-coderun.py scripts/presence-morgan-task-smoke.py`
@@ -141,3 +165,13 @@ Search for open PRs with `control plane OR presence OR discord bridge OR hermes 
 Kubernetes context exists (`in-cluster`), but the current service account cannot read the prerequisites needed for live/semi-live smoke evidence. Safe read checks failed with RBAC errors for pods/secrets/services/CRDs due to missing `cto-hermes-gateway` ClusterRole. No token values were read or printed.
 
 Until RBAC is restored or a human runs the smoke from an authorized context, the next percentage jump into the 45–60% ladder remains blocked on live Hermes CodeRun/Discord evidence rather than more unit coverage.
+
+Refreshed 2026-05-04T02:26Z checks:
+
+```bash
+for res in 'get secrets' 'create coderuns' 'delete coderuns' 'get pods' 'get pods/log'; do
+  kubectl auth can-i $res -n cto
+done
+```
+
+All checks still returned `no` with the same missing `cto-hermes-gateway` ClusterRole error class. No secret values were read or printed.
