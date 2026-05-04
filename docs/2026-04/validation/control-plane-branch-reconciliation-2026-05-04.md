@@ -56,6 +56,13 @@ Refreshed state at 2026-05-04T04:30:08Z after `git fetch origin main --prune` an
 ?? .hermes/
 ```
 
+Refreshed state at 2026-05-04T05:45:05Z after `git fetch origin main --prune` and the RBAC GitOps fix commit:
+
+```text
+## main...origin/main [ahead 18, behind 16]
+?? .hermes/
+```
+
 A safety branch was created locally at the current stack tip before rebase/force-push surgery:
 
 ```text
@@ -183,6 +190,12 @@ Refreshed 2026-05-04T04:30:08Z:
 - Check rollup remains complete: 13 successful checks and 4 expected skips. Successful checks include Discord Bridge Test & Build, Hermes Presence Adapter Test & Build, Controller CI changes/lint-rust/test-rust/integration-tests, CodeQL Analyze (rust), Code Quality jobs, Skills Security Scan, and mirror. Publish/build-and-push/security-scan jobs remain skipped because this is a PR head, not a main-branch publish.
 - Local `HEAD`, local safety branch, and `origin/control-plane-presence-hardening-2026-05-04` all point at `f791ce32`; the open PR head also points at `f791ce32`, so the remote PR protects the current delivered stack tip before this note refresh.
 
+Refreshed 2026-05-04T05:45:05Z:
+
+- Local `HEAD`, local safety branch, `origin/control-plane-presence-hardening-2026-05-04`, and PR #4925 head all point at `fa58aa6d` after the builder RBAC GitOps fix was pushed.
+- PR #4925 remains `MERGEABLE`; all non-publish checks in the status rollup are complete and successful, while main-branch-only publish jobs remain skipped as expected for a PR.
+- The local branch remains `main...origin/main [ahead 18, behind 16]`; the remote-only stack is still the 16 intake/Hermes-gateway commits listed above, so broad rebase/push surgery is still deferred to the PR review/merge path rather than this heartbeat.
+
 ## Recommended next safe action
 
 Completed in the 2026-05-04T02:26Z heartbeat:
@@ -254,3 +267,16 @@ kubectl get svc -n bots discord-bridge-http -o jsonpath='{.metadata.name}{"\\n"}
 ```
 
 All read/create prerequisite checks still returned `no` or `Forbidden` with missing `cto-hermes-gateway` ClusterRole. The service account is `system:serviceaccount:cto:cto-hermes-coder-control`. Only resource names and error class were recorded; no secret values were read or printed.
+
+Refreshed 2026-05-04T05:45Z checks:
+
+```bash
+kubectl auth can-i get secret/openclaw-discord-tokens -n cto
+kubectl auth can-i get pods -n cto
+kubectl auth can-i get svc -n bots
+kubectl auth can-i create pods -n cto
+kubectl get secret openclaw-discord-tokens -n cto -o jsonpath='{.metadata.name}{"\\n"}'
+kubectl get svc -n bots discord-bridge-http -o jsonpath='{.metadata.name}{"\\n"}'
+```
+
+All checks still returned `no` or `Forbidden` with the same missing `cto-hermes-gateway` ClusterRole error class. The PR now carries a GitOps manifest fix that creates/binds `ClusterRole/cto-hermes-coder-control`, but this live service account will remain blocked until PR #4925 is merged and the relevant ArgoCD application syncs. No secret values were read or printed.
