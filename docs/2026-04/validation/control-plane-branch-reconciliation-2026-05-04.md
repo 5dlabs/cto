@@ -4,6 +4,8 @@ Timestamp: 2026-05-04T02:02:40Z
 
 Heartbeat refresh: 2026-05-04T03:40:27Z
 
+Heartbeat refresh: 2026-05-04T04:30:08Z
+
 ## Purpose
 
 Capture the mergeability/evidence handoff state for the local CTO Discord control-plane work-loop without doing broad rebase or force-push surgery from the autonomous heartbeat.
@@ -44,6 +46,13 @@ Refreshed state at 2026-05-04T03:40:27Z after PR creation/CI checks and `git fet
 
 ```text
 ## main...origin/main [ahead 15, behind 16]
+?? .hermes/
+```
+
+Refreshed state at 2026-05-04T04:30:08Z after `git fetch origin main --prune` and before this note refresh was committed:
+
+```text
+## main...origin/main [ahead 16, behind 16]
 ?? .hermes/
 ```
 
@@ -168,6 +177,12 @@ Refreshed 2026-05-04T03:40:27Z:
 - `gh pr checks 4925 --watch --interval 10` reported all required non-publish checks passing: CodeQL Analyze (rust), Discord Bridge Test & Build, Hermes Presence Adapter Test & Build, Controller CI changes/lint-rust/test-rust/integration-tests, code-quality scans, skills scan, and mirror. Main-branch-only publish/build-and-push/security-scan jobs were `skipping` as expected for the PR.
 - Branch diff still has zero path overlap against the remote-only `origin/main` stack from merge base `85ee0d503f8c`, based on the refreshed path-overlap check (`local_count 30`, `remote_count 48`, `overlap_count 0`).
 
+Refreshed 2026-05-04T04:30:08Z:
+
+- `gh pr view 4925 --json headRefOid,mergeable,statusCheckRollup` still reports PR #4925 `MERGEABLE` at head `f791ce32`.
+- Check rollup remains complete: 13 successful checks and 4 expected skips. Successful checks include Discord Bridge Test & Build, Hermes Presence Adapter Test & Build, Controller CI changes/lint-rust/test-rust/integration-tests, CodeQL Analyze (rust), Code Quality jobs, Skills Security Scan, and mirror. Publish/build-and-push/security-scan jobs remain skipped because this is a PR head, not a main-branch publish.
+- Local `HEAD`, local safety branch, and `origin/control-plane-presence-hardening-2026-05-04` all point at `f791ce32`; the open PR head also points at `f791ce32`, so the remote PR protects the current delivered stack tip before this note refresh.
+
 ## Recommended next safe action
 
 Completed in the 2026-05-04T02:26Z heartbeat:
@@ -189,6 +204,14 @@ Completed in the 2026-05-04T03:40Z heartbeat:
 - Watched PR checks to completion; all CI checks required for the presence hardening/reconciliation stack passed, with only PR-expected publish jobs skipped.
 - Re-ran branch/path-overlap inspection after fetch: local `main` is ahead 15 / behind 16 because this note was refreshed locally, while PR #4925 points at the remote safety branch tip `108bbe62`; local/remote path overlap from merge base remains `0`.
 - Re-ran RBAC prerequisite antenna; live CodeRun/Discord smoke prerequisites are still blocked by the missing `cto-hermes-gateway` ClusterRole, and no secret values were read or printed.
+
+Completed in the 2026-05-04T04:30Z heartbeat:
+
+- Reconfirmed local `main` remains diverged (`ahead 16, behind 16`) with only `.hermes/` untracked and no working-tree product diff before this note refresh.
+- Reconfirmed PR #4925 remains the correct mergeability handoff: `MERGEABLE`, head `f791ce32`, 13 successful checks and 4 expected PR skips.
+- Re-ran validation-matrix status count: 92 tracked rows; `PASS` 2, `UNIT_PASS` 28, `NOT_STARTED` 48, `BLOCKED` 14. This is unchanged in live-completion terms; progress is waiting on PR merge and live smoke prerequisites, not more local contract rows.
+- Re-ran safe RBAC prerequisite antenna; the service account still cannot read the `cto` secret, `cto` pods, or `bots` service and cannot create `cto` pods. All failures cite missing `cto-hermes-gateway` ClusterRole; no token values were read or printed.
+- Re-ran no-mutation checks: `git diff --check`, Python smoke harness `py_compile`, and Hermes CodeRun smoke dry-run all passed.
 
 Remaining safe sequence:
 
@@ -218,3 +241,16 @@ done
 ```
 
 All checks still returned `no` with the same missing `cto-hermes-gateway` ClusterRole error class. No secret values were read or printed.
+
+Refreshed 2026-05-04T04:30Z checks:
+
+```bash
+kubectl auth can-i get secret/openclaw-discord-tokens -n cto
+kubectl auth can-i get pods -n cto
+kubectl auth can-i get svc -n bots
+kubectl auth can-i create pods -n cto
+kubectl get secret openclaw-discord-tokens -n cto -o jsonpath='{.metadata.name}{"\\n"}'
+kubectl get svc -n bots discord-bridge-http -o jsonpath='{.metadata.name}{"\\n"}'
+```
+
+All read/create prerequisite checks still returned `no` or `Forbidden` with missing `cto-hermes-gateway` ClusterRole. The service account is `system:serviceaccount:cto:cto-hermes-coder-control`. Only resource names and error class were recorded; no secret values were read or printed.
