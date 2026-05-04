@@ -176,6 +176,32 @@ kubectl -n cto get coderun hermes-coderun-59h5x1qa -o name
 
 Result: fresh PASS evidence that the merged/current-main synthetic Hermes CodeRun path remains healthy: route registration, authenticated `/presence/inbound` delivery, adapter pod/log observation, and cleanup. This remains the same ladder rung as prior H-01 evidence because it is still synthetic normalized ingress, not live Discord ingress/outbound or semantic Hermes worker response.
 
+## Follow-up live smoke — 2026-05-04T13:08Z
+
+The scheduled heartbeat reran the same live Hermes CodeRun smoke against clean local/remote `main` at `6a90ceaf95649256e47d01d8231564be6437a783`; the `hermes-control-plane-builder` ArgoCD application reported target revision `main`, sync `Synced`, health `Healthy`, and live revision `6a90ceaf95649256e47d01d8231564be6437a783`. RBAC prerequisite checks returned `yes` for reading the redacted token secret name, reading pods/services, and creating/deleting temporary CodeRuns/pods.
+
+Observed safe output excerpts; the `PRESENCE_SHARED_TOKEN` value was sourced from Kubernetes into process environment only and was not printed or written:
+
+```text
+[smoke] mode=live
+[smoke] route registered: hermes-coderun-lm5zksvl
+[smoke] route summary: {"agent_id": "rex", "coderun_id": "hermes-coderun-lm5zksvl", "project_id": "presence-smoke", "route_id": "hermes-coderun-lm5zksvl", "runtime": "hermes", "task_id": "1", "worker_url_present": true}
+[smoke] posting synthetic Discord event through /presence/inbound
+[smoke] adapter pod discovered with selector app=controller,component=code-runner,service=presence-smoke: t1-codex-gpt-5-codex-default-2ce37d1c-v1-blwz2
+[smoke] adapter pod observed: t1-codex-gpt-5-codex-default-2ce37d1c-v1-blwz2
+[smoke] passed
+[smoke] $ kubectl -n cto delete coderun hermes-coderun-lm5zksvl --ignore-not-found
+```
+
+Cleanup verification after the run:
+
+```text
+kubectl -n cto get coderun hermes-coderun-lm5zksvl
+# Error from server (NotFound): coderuns.agents.platform "hermes-coderun-lm5zksvl" not found
+```
+
+Result: repeated PASS evidence on the current deployed main revision for the synthetic Hermes CodeRun slice: route registration, authenticated `/presence/inbound` delivery, adapter pod/log observation, and CodeRun cleanup. This still does not prove real Discord ingress/outbound or semantic Hermes worker response, so H-02/H-03/H-04/H-20 remain `NOT_STARTED`.
+
 ## Adjacent CI/image evidence
 
 After PR #4925 merged, the Discord bridge publish workflow succeeded on push run `25305273050` for commit `67c415654fa22ee27fc62dd72c649a518b280ca7`.
