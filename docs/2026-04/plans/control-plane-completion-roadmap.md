@@ -57,10 +57,10 @@ Those artifacts should be reviewed in a follow-up PR or intentionally discarded.
 
 ### Known gaps
 
-- No confirmed publish workflow for `ghcr.io/5dlabs/hermes-presence-adapter`.
-- No complete live Hermes CodeRun E2E validation matrix.
-- Session/home/crown semantics are incomplete; `/sethome` install-context behavior is fixed, but control-plane route/session rules still need implementation and tests.
-- Morgan Hermes sidecar/MCP implementation is not present/validated.
+- No confirmed successful publish workflow for `ghcr.io/5dlabs/hermes-presence-adapter`; main-branch test/build passes, but image publish is blocked by GHCR `write_package` permission.
+- Live Hermes CodeRun synthetic route-registration/inbound/pod-discovery smoke is passing, but live Discord ingress/outbound and semantic worker-response evidence remain.
+- Session/home/crown semantics are incomplete; `/sethome` install-context behavior is fixed, but control-plane route/session rules still need live Discord validation.
+- Morgan Hermes sidecar/MCP source location is decided for the first stub: implement it in `5dlabs/cto` as `apps/morgan-agent-sidecar`, with `5dlabs/morgan-meet` remaining the OpenClaw-first demo/product plan. The sidecar image/package and live CodeRun attachment are not implemented yet.
 - Durable many-Hermes-pod coordination plane is not implemented.
 - OpenCloud/OpenClaw adapter remains to implement/validate.
 - Hosted/generic adapter remains to implement/validate.
@@ -173,7 +173,7 @@ Assumption: one primary engineer plus Copilot/Hermes subagents/reviewers. Estima
 
 ### Phase 4: Morgan Hermes sidecar/MCP MVP
 
-- Reconcile Morgan Meet source/API and decide sidecar repo/package location.
+- Reconcile Morgan Meet contracts against the accepted source decision: first Hermes stub sidecar in `5dlabs/cto` as `apps/morgan-agent-sidecar`; `5dlabs/morgan-meet` remains the OpenClaw-first demo/product plan and compatibility reference.
 - Implement a Morgan sidecar exposing MCP tools and workspace streams:
   - Tools: `meet_join`, `meet_leave`, `meet_get_status`, `meet_stream_audio`.
   - Streams/files: `/workspace/meet-events.jsonl`, `/workspace/meet-commands.jsonl`, `/workspace/meet-status.json`.
@@ -245,7 +245,7 @@ Assumption: one primary engineer plus Copilot/Hermes subagents/reviewers. Estima
 ## Open questions
 
 1. Is current-scope 100% allowed to exclude advanced avatar vendor bakeoffs beyond LemonSlice/LiveKit MVP?
-2. Where should Morgan sidecar source live first: `5dlabs/morgan-meet`, `5dlabs/cto`, or a shared package?
+2. Which provider secrets and meeting identity should the later Morgan sidecar use after the stub path is green?
 3. What are canonical live validation Discord surfaces for DM/guild/thread/private channel?
 4. Which agent IDs are canonical for live route matching: `morgan`, `coder`, `rex`, `metal`, others?
 5. Should the first coordination plane use NATS JetStream immediately or a simpler store behind an interface?
