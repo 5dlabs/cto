@@ -1,0 +1,65 @@
+name: Morgan Agent Sidecar – Build and Publish Docker Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/morgan-agent-sidecar/**"
+      - ".github/workflows/morgan-agent-sidecar-publish.yml"
+  pull_request:
+    paths:
+      - "apps/morgan-agent-sidecar/**"
+      - ".github/workflows/morgan-agent-sidecar-publish.yml"
+
+permissions:
+  contents: read
+  packages: write # for publishing to GitHub Container Registry
+
+defaults:
+  run:
+    working-directory: apps/morgan-agent-sidecar
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type-check and build
+        run: npm run build
+
+  publish-docker:
+    name: Publish Docker Image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read package version
+        id: version
+        working-directory: apps/morgan-agent-sidecar
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: morgan-agent-sidecar
+          context: apps/morgan-agent-sidecar
+          dockerfile: apps/morgan-agent-sidecar/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ github.sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
