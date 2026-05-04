@@ -80,7 +80,7 @@ Each completed row should include:
 
 | ID | Use case | Status | Owner | Validation command/procedure | Expected result | Evidence |
 |---|---|---|---|---|---|---|
-| M-01 | Decide Morgan sidecar source location | `BLOCKED` | TBD | Architecture decision record/PR. | Source repo/package is selected: `morgan-meet`, `cto`, or shared package. | TBD |
+| M-01 | Decide Morgan sidecar source location | `BLOCKED` | TBD | Architecture decision record/PR. 2026-05-04 semi-live routing antenna (`scripts/presence-morgan-task-smoke.py`) proved the deployed bridge can route synthetic Morgan DM and Sigma One task-channel events, but it did not decide sidecar source. | Source repo/package is selected: `morgan-meet`, `cto`, or shared package. | Routing evidence: `docs/2026-04/validation/morgan-task-routing-smoke-2026-05-04.md`; decision remains blocked. |
 | M-02 | Morgan sidecar image/package exists | `BLOCKED` | TBD | Build/package sidecar after M-01. | Durable image/package exists with health endpoint. | TBD |
 | M-03 | Morgan sidecar attaches to Hermes CodeRun | `BLOCKED` | TBD | Render/launch CodeRun with Morgan enabled. | Pod includes Morgan sidecar, shared `/workspace`, env, health/readiness. | TBD |
 | M-04 | ACPX discovers Morgan MCP tools | `BLOCKED` | TBD | Inspect generated ACPX config and call tool listing. | `meet_join`, `meet_leave`, `meet_get_status`, `meet_stream_audio` visible. | TBD |
