@@ -108,8 +108,48 @@ kubectl -n cto get coderun hermes-coderun-zc45za2s -o name
 
 Result: this upgrades the previous synthetic Hermes CodeRun live smoke from route-delivery-only to adapter-pod-observed evidence for the same route registration, authenticated `/presence/inbound` HTTP `202`, adapter container discovery/log-tail, and cleanup slice. It still does not prove a real Discord ingress event or an end-to-end Hermes worker semantic response.
 
+## Follow-up live smoke — 2026-05-04T10:40Z
+
+A second post-merge heartbeat reran the live Hermes CodeRun smoke against current `origin/main`/ArgoCD revision `b6dd2e33cf5ba937152abf3767b0262f24542dd6` after PR #4928 merged. The token was again sourced from Kubernetes Secret key `PRESENCE_SHARED_TOKEN` into process environment only and was not printed or written.
+
+Preconditions immediately before the run:
+
+```text
+kubectl auth can-i get secrets/openclaw-discord-tokens -n cto -> yes
+kubectl auth can-i get pods -n cto -> yes
+kubectl auth can-i get services -n bots -> yes
+kubectl auth can-i create pods -n cto -> yes
+kubectl auth can-i create coderuns -n cto -> yes
+kubectl auth can-i delete coderuns -n cto -> yes
+hermes-control-plane-builder targetRevision=main, sync=Synced, health=Healthy, revision=b6dd2e33cf5ba937152abf3767b0262f24542dd6
+```
+
+Observed safe output excerpts:
+
+```text
+[smoke] mode=live
+[smoke] route registered: hermes-coderun-x9j4jq97
+[smoke] route summary: {"agent_id": "rex", "coderun_id": "hermes-coderun-x9j4jq97", "project_id": "presence-smoke", "route_id": "hermes-coderun-x9j4jq97", "runtime": "hermes", "task_id": "1", "worker_url_present": true}
+[smoke] posting synthetic Discord event through /presence/inbound
+[smoke] adapter pod discovered with selector app=controller,component=code-runner,service=presence-smoke: t1-codex-gpt-5-codex-default-3995f4d1-v1-g7bt7
+[smoke] adapter pod observed: t1-codex-gpt-5-codex-default-3995f4d1-v1-g7bt7
+[smoke] passed
+[smoke] $ kubectl -n cto delete coderun hermes-coderun-x9j4jq97 --ignore-not-found
+```
+
+Cleanup verification after the run:
+
+```text
+kubectl -n cto get coderun hermes-coderun-x9j4jq97 -o name
+# Error from server (NotFound): coderuns.agents.platform "hermes-coderun-x9j4jq97" not found
+
+# Authenticated route registry inspection reported route_count 4 and matching_route_count 0 for hermes-coderun-x9j4jq97.
+```
+
+Result: repeated PASS evidence for the live synthetic Hermes CodeRun slice on current `main`: route registration, authenticated `/presence/inbound` delivery, adapter pod discovery/log-tail, and cleanup. This still does not prove real Discord ingress/outbound or semantic Hermes worker response, so H-02/H-03/H-04/H-20 remain `NOT_STARTED`.
+
 ## Adjacent CI/image evidence
 
 After PR #4925 merged, the Discord bridge publish workflow succeeded on push run `25305273050` for commit `67c415654fa22ee27fc62dd72c649a518b280ca7`.
 
-The new Hermes presence adapter publish workflow ran on push run `25305273066`; its test/build job succeeded, but the publish job failed with GHCR `write_package` permission denial while pushing `ghcr.io/5dlabs/hermes-presence-adapter:latest`. This blocks image-publish `PASS` for the adapter until package permissions or workflow registry permissions are corrected.
+The new Hermes presence adapter publish workflow ran on push run `25305273066`; its test/build job succeeded, but the publish job failed with GHCR `write_package` permission denial while pushing `ghcr.io/5dlabs/hermes-presence-adapter:latest`. This blocks image-publish `PASS` for the adapter until package permissions or workflow registry permissions are corrected. A 2026-05-04T10:40Z recheck still showed run `25305273066` as the latest `main` push run for `hermes-presence-adapter-publish.yml` and still `failure`; no newer successful publish run exists yet.
