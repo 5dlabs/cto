@@ -148,6 +148,34 @@ kubectl -n cto get coderun hermes-coderun-x9j4jq97 -o name
 
 Result: repeated PASS evidence for the live synthetic Hermes CodeRun slice on current `main`: route registration, authenticated `/presence/inbound` delivery, adapter pod discovery/log-tail, and cleanup. This still does not prove real Discord ingress/outbound or semantic Hermes worker response, so H-02/H-03/H-04/H-20 remain `NOT_STARTED`.
 
+## Follow-up live smoke — 2026-05-04T12:14Z
+
+The scheduled heartbeat reran the live Hermes CodeRun smoke against current local/remote `main` at `0b8319b926fad82cf0cb9ca4a2d25dbe4c974d48` with the `hermes-control-plane-builder` ArgoCD application reporting target revision `main`, sync `Synced`, health `Healthy`, and live revision `0b8319b926fad82cf0cb9ca4a2d25dbe4c974d48`. RBAC prerequisite checks again returned `yes` for reading the redacted token secret name, reading pods/services, and creating/deleting temporary CodeRuns/pods.
+
+Observed safe output excerpts; the `PRESENCE_SHARED_TOKEN` value was sourced from Kubernetes into process environment only and was not printed or written:
+
+```text
+[smoke] mode=live
+[smoke] route registered: hermes-coderun-59h5x1qa
+[smoke] route summary: {"agent_id": "rex", "coderun_id": "hermes-coderun-59h5x1qa", "project_id": "presence-smoke", "route_id": "hermes-coderun-59h5x1qa", "runtime": "hermes", "task_id": "1", "worker_url_present": true}
+[smoke] posting synthetic Discord event through /presence/inbound
+[smoke] adapter pod discovered with selector app=controller,component=code-runner,service=presence-smoke: t1-codex-gpt-5-codex-default-0a9743b0-v1-9t9jp
+[smoke] adapter pod observed: t1-codex-gpt-5-codex-default-0a9743b0-v1-9t9jp
+[smoke] passed
+[smoke] $ kubectl -n cto delete coderun hermes-coderun-59h5x1qa --ignore-not-found
+```
+
+Cleanup verification after the run:
+
+```text
+kubectl -n cto get coderun hermes-coderun-59h5x1qa -o name
+# Error from server (NotFound): coderuns.agents.platform "hermes-coderun-59h5x1qa" not found
+
+# Authenticated route registry inspection reported route_count 4 and matching_route_count 0 for hermes-coderun-59h5x1qa.
+```
+
+Result: fresh PASS evidence that the merged/current-main synthetic Hermes CodeRun path remains healthy: route registration, authenticated `/presence/inbound` delivery, adapter pod/log observation, and cleanup. This remains the same ladder rung as prior H-01 evidence because it is still synthetic normalized ingress, not live Discord ingress/outbound or semantic Hermes worker response.
+
 ## Adjacent CI/image evidence
 
 After PR #4925 merged, the Discord bridge publish workflow succeeded on push run `25305273050` for commit `67c415654fa22ee27fc62dd72c649a518b280ca7`.
