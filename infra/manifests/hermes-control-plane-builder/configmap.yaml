@@ -74,6 +74,14 @@ data:
 
     Produce and then execute a concrete implementation plan for a runtime-neutral
     Discord control plane. Keep Hermes and OpenClaw adapters contract-compatible.
+
+    ## Pull request authority
+
+    edge_kase authorizes this control-plane builder agent to merge PRs itself
+    when a PR needs to land. Before merging, verify the PR is mergeable, CI/checks
+    are green or intentionally skipped, and the change does not expose secrets.
+    After merging, verify the PR is merged and inspect the resulting main-branch
+    CI/GitOps state before reporting success.
   TOOLS.md: |
     # Runtime Tool Guide
 
