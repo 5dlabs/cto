@@ -2,7 +2,7 @@
 
 Timestamp: 2026-05-04T02:02:40Z
 
-Heartbeat refresh: 2026-05-04T02:51:35Z
+Heartbeat refresh: 2026-05-04T03:40:27Z
 
 ## Purpose
 
@@ -40,6 +40,13 @@ Refreshed state at 2026-05-04T02:51:35Z after `git fetch origin main --prune` an
 ?? .hermes/
 ```
 
+Refreshed state at 2026-05-04T03:40:27Z after PR creation/CI checks and `git fetch origin main --prune`:
+
+```text
+## main...origin/main [ahead 15, behind 16]
+?? .hermes/
+```
+
 A safety branch was created locally at the current stack tip before rebase/force-push surgery:
 
 ```text
@@ -55,6 +62,7 @@ origin/control-plane-presence-hardening-2026-05-04
 Local-only commits not on `origin/main`:
 
 ```text
+108bbe62 docs(control-plane): publish reconciliation branch handoff
 3fb33da6 docs(control-plane): refresh reconciliation safety branch evidence
 da69ed87 docs(control-plane): record branch reconciliation handoff
 ede6c98c test(presence): propagate addressing provenance
@@ -153,6 +161,13 @@ Morgan policy/design evidence:
 
 Search for open PRs with `control plane OR presence OR discord bridge OR hermes adapter` returned no dedicated control-plane PR; the results were unrelated release/dependabot PRs.
 
+Refreshed 2026-05-04T03:40:27Z:
+
+- PR #4925 exists from `control-plane-presence-hardening-2026-05-04` to `main`: <https://github.com/5dlabs/cto/pull/4925>.
+- `gh pr view`/`gh pr list` reported `mergeable: MERGEABLE` for #4925.
+- `gh pr checks 4925 --watch --interval 10` reported all required non-publish checks passing: CodeQL Analyze (rust), Discord Bridge Test & Build, Hermes Presence Adapter Test & Build, Controller CI changes/lint-rust/test-rust/integration-tests, code-quality scans, skills scan, and mirror. Main-branch-only publish/build-and-push/security-scan jobs were `skipping` as expected for the PR.
+- Branch diff still has zero path overlap against the remote-only `origin/main` stack from merge base `85ee0d503f8c`, based on the refreshed path-overlap check (`local_count 30`, `remote_count 48`, `overlap_count 0`).
+
 ## Recommended next safe action
 
 Completed in the 2026-05-04T02:26Z heartbeat:
@@ -168,10 +183,17 @@ Completed in the 2026-05-04T02:51Z heartbeat:
 - Re-ran merge-base/path-overlap analysis after fetch: local 30 paths, remote 48 paths, overlap 0.
 - Re-ran no-mutation antenna checks: `git diff --check`, Python smoke harness `py_compile`, Hermes CodeRun smoke dry-run, and package-scoped tests/builds for `apps/discord-bridge`, `apps/hermes-presence-adapter`, and `apps/agent-coordination-plane` all passed.
 
+Completed in the 2026-05-04T03:40Z heartbeat:
+
+- Confirmed PR #4925 is open, targets `main`, and is `MERGEABLE` without rebasing or force-pushing local `main`.
+- Watched PR checks to completion; all CI checks required for the presence hardening/reconciliation stack passed, with only PR-expected publish jobs skipped.
+- Re-ran branch/path-overlap inspection after fetch: local `main` is ahead 15 / behind 16 because this note was refreshed locally, while PR #4925 points at the remote safety branch tip `108bbe62`; local/remote path overlap from merge base remains `0`.
+- Re-ran RBAC prerequisite antenna; live CodeRun/Discord smoke prerequisites are still blocked by the missing `cto-hermes-gateway` ClusterRole, and no secret values were read or printed.
+
 Remaining safe sequence:
 
-1. Open a PR from `control-plane-presence-hardening-2026-05-04` or create a PR branch derived from it; do not push local `main` directly.
-2. Rebase that branch onto `origin/main` or merge `origin/main` into it, preserving the 14 local commits as reviewable chunks.
+1. Merge or review PR #4925 once product/reviewer approval is available; do not push local `main` directly.
+2. After merge, sync local `main` to `origin/main` or rebase remaining local-only note updates onto the merged branch, preserving reviewable chunks.
 3. Rerun package-scoped validation after reconciliation:
    - `git diff --check`
    - `python3 -m py_compile scripts/presence-smoke-hermes-coderun.py scripts/presence-morgan-task-smoke.py`
@@ -187,10 +209,10 @@ Kubernetes context exists (`in-cluster`), but the current service account cannot
 
 Until RBAC is restored or a human runs the smoke from an authorized context, the next percentage jump into the 45–60% ladder remains blocked on live Hermes CodeRun/Discord evidence rather than more unit coverage.
 
-Refreshed 2026-05-04T02:26Z checks:
+Refreshed 2026-05-04T03:40Z checks:
 
 ```bash
-for res in 'get secrets' 'create coderuns' 'delete coderuns' 'get pods' 'get pods/log'; do
+for res in 'get secrets' 'create coderuns' 'delete coderuns' 'get pods' 'get pods/log' 'get services' 'get crds'; do
   kubectl auth can-i $res -n cto
 done
 ```
