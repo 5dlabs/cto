@@ -6,6 +6,8 @@ Heartbeat refresh: 2026-05-04T03:40:27Z
 
 Heartbeat refresh: 2026-05-04T04:30:08Z
 
+Heartbeat refresh: 2026-05-04T06:10:18Z
+
 ## Purpose
 
 Capture the mergeability/evidence handoff state for the local CTO Discord control-plane work-loop without doing broad rebase or force-push surgery from the autonomous heartbeat.
@@ -63,6 +65,13 @@ Refreshed state at 2026-05-04T05:45:05Z after `git fetch origin main --prune` an
 ?? .hermes/
 ```
 
+Refreshed state at 2026-05-04T06:10:18Z after `git fetch origin main --prune`, the PR branch push, and the live-RBAC blocker evidence refresh:
+
+```text
+## main...origin/main [ahead 19, behind 16]
+?? .hermes/
+```
+
 A safety branch was created locally at the current stack tip before rebase/force-push surgery:
 
 ```text
@@ -78,6 +87,10 @@ origin/control-plane-presence-hardening-2026-05-04
 Local-only commits not on `origin/main`:
 
 ```text
+5cd064f9 docs(control-plane): refresh live RBAC blocker evidence
+fa58aa6d fix(control-plane): restore builder RBAC prerequisite
+aa8a4514 docs(control-plane): refresh PR and RBAC heartbeat evidence
+f791ce32 docs(control-plane): record PR mergeability evidence
 108bbe62 docs(control-plane): publish reconciliation branch handoff
 3fb33da6 docs(control-plane): refresh reconciliation safety branch evidence
 da69ed87 docs(control-plane): record branch reconciliation handoff
@@ -196,6 +209,12 @@ Refreshed 2026-05-04T05:45:05Z:
 - PR #4925 remains `MERGEABLE`; all non-publish checks in the status rollup are complete and successful, while main-branch-only publish jobs remain skipped as expected for a PR.
 - The local branch remains `main...origin/main [ahead 18, behind 16]`; the remote-only stack is still the 16 intake/Hermes-gateway commits listed above, so broad rebase/push surgery is still deferred to the PR review/merge path rather than this heartbeat.
 
+Refreshed 2026-05-04T06:10:18Z:
+
+- Local `HEAD`, local safety branch, `origin/control-plane-presence-hardening-2026-05-04`, and PR #4925 head all point at `5cd064f9` after the live RBAC blocker evidence refresh was pushed.
+- PR #4925 remains `MERGEABLE`; the status rollup is complete with Discord Bridge Test & Build, Hermes Presence Adapter Test & Build, Controller CI changes/lint-rust/test-rust/integration-tests, CodeQL Analyze (rust), Code Quality jobs, Skills Security Scan, and mirror all successful. Main-branch-only publish/build-and-push/security-scan jobs remain skipped as expected for a PR.
+- The local branch remains `main...origin/main [ahead 19, behind 16]`; the remote-only stack is still the 16 intake/Hermes-gateway commits listed above, so broad rebase/push surgery remains deferred to the PR review/merge path rather than this heartbeat.
+
 ## Recommended next safe action
 
 Completed in the 2026-05-04T02:26Z heartbeat:
@@ -225,6 +244,13 @@ Completed in the 2026-05-04T04:30Z heartbeat:
 - Re-ran validation-matrix status count: 92 tracked rows; `PASS` 2, `UNIT_PASS` 28, `NOT_STARTED` 48, `BLOCKED` 14. This is unchanged in live-completion terms; progress is waiting on PR merge and live smoke prerequisites, not more local contract rows.
 - Re-ran safe RBAC prerequisite antenna; the service account still cannot read the `cto` secret, `cto` pods, or `bots` service and cannot create `cto` pods. All failures cite missing `cto-hermes-gateway` ClusterRole; no token values were read or printed.
 - Re-ran no-mutation checks: `git diff --check`, Python smoke harness `py_compile`, and Hermes CodeRun smoke dry-run all passed.
+
+Completed in the 2026-05-04T06:10Z heartbeat:
+
+- Reconfirmed local `main` remains diverged (`ahead 19, behind 16`) with only `.hermes/` untracked and no pre-existing working-tree product diff before this note refresh.
+- Reconfirmed PR #4925 remains the correct mergeability handoff: `MERGEABLE`, head `5cd064f9`, and all non-publish status checks in the rollup are complete/successful; PR-only publish jobs are skipped as expected.
+- Re-ran validation-matrix status count: 93 tracked rows; `PASS` 2, `UNIT_PASS` 29, `NOT_STARTED` 48, `BLOCKED` 14. This is unchanged in live-completion terms; progress is waiting on PR merge plus RBAC/GitOps sync and live smoke prerequisites, not more local contract rows.
+- Re-ran safe RBAC prerequisite antenna; the service account still cannot read the `cto` secret or `bots` service and cannot get/create required cluster resources. All failures cite missing `cto-hermes-gateway` ClusterRole; no token values were read or printed.
 
 Remaining safe sequence:
 
@@ -280,3 +306,16 @@ kubectl get svc -n bots discord-bridge-http -o jsonpath='{.metadata.name}{"\\n"}
 ```
 
 All checks still returned `no` or `Forbidden` with the same missing `cto-hermes-gateway` ClusterRole error class. The PR now carries a GitOps manifest fix that creates/binds `ClusterRole/cto-hermes-coder-control`, but this live service account will remain blocked until PR #4925 is merged and the relevant ArgoCD application syncs. No secret values were read or printed.
+
+Refreshed 2026-05-04T06:10Z checks:
+
+```bash
+kubectl auth can-i get secret/openclaw-discord-tokens -n cto
+kubectl auth can-i get pods -n cto
+kubectl auth can-i get svc -n bots
+kubectl auth can-i create pods -n cto
+kubectl get secret openclaw-discord-tokens -n cto -o jsonpath='{.metadata.name}{"\\n"}'
+kubectl get svc -n bots discord-bridge-http -o jsonpath='{.metadata.name}{"\\n"}'
+```
+
+All checks still returned `no` or `Forbidden` with the same missing `cto-hermes-gateway` ClusterRole error class for service account `system:serviceaccount:cto:cto-hermes-coder-control`. The remote PR branch already carries the self-contained `ClusterRole/cto-hermes-coder-control` GitOps fix, so the next live evidence jump is blocked on PR merge plus ArgoCD sync, not additional local unit coverage. Only resource names and error class were recorded; no secret values were read or printed.
