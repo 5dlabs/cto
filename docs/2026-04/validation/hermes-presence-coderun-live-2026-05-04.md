@@ -75,6 +75,39 @@ PASS for the live route-registration, authenticated synthetic inbound, HTTP `202
 
 Remaining gap before strongest end-to-end acceptance: the harness did not find the adapter pod by smoke label before timeout, so this run lacks adapter-log or worker-consumption proof. A stronger follow-up should either fix pod-label discovery or add a redacted inbox/adapter acknowledgement check, then run live Discord ingress/outbound evidence.
 
+## Follow-up live smoke — 2026-05-04T09:33Z
+
+A follow-up heartbeat hardened `scripts/presence-smoke-hermes-coderun.py` to discover the controller-rendered adapter pod by fallback labels when the CR-level `smoke.5dlabs.ai/run-id` label is not preserved on Jobs/Pods. The new lookup order is:
+
+1. `smoke.5dlabs.ai/run-id=<run-id>`
+2. `cleanup.5dlabs.ai/run=<coderun-name>`
+3. `app=controller,component=code-runner,service=<service>`
+
+Live command used the same no-secret pattern: source Kubernetes Secret key `PRESENCE_SHARED_TOKEN` into process environment only, then run `python3 scripts/presence-smoke-hermes-coderun.py --mode live`. No token value was printed or written.
+
+Observed safe output excerpts:
+
+```text
+[smoke] mode=live
+[smoke] route registered: hermes-coderun-zc45za2s
+[smoke] posting synthetic Discord event through /presence/inbound
+[smoke] adapter pod discovered with selector app=controller,component=code-runner,service=presence-smoke: t1-codex-gpt-5-codex-default-65c71de1-v1-fnrvx
+[smoke] adapter pod observed: t1-codex-gpt-5-codex-default-65c71de1-v1-fnrvx
+[smoke] passed
+[smoke] $ kubectl -n cto delete coderun hermes-coderun-zc45za2s --ignore-not-found
+```
+
+Cleanup verification after the run:
+
+```text
+kubectl -n cto get coderun hermes-coderun-zc45za2s -o name
+# Error from server (NotFound): coderuns.agents.platform "hermes-coderun-zc45za2s" not found
+
+# Authenticated route registry inspection reported route_count 4 and matching_route_count 0 for hermes-coderun-zc45za2s.
+```
+
+Result: this upgrades the previous synthetic Hermes CodeRun live smoke from route-delivery-only to adapter-pod-observed evidence for the same route registration, authenticated `/presence/inbound` HTTP `202`, adapter container discovery/log-tail, and cleanup slice. It still does not prove a real Discord ingress event or an end-to-end Hermes worker semantic response.
+
 ## Adjacent CI/image evidence
 
 After PR #4925 merged, the Discord bridge publish workflow succeeded on push run `25305273050` for commit `67c415654fa22ee27fc62dd72c649a518b280ca7`.

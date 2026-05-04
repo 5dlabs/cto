@@ -323,17 +323,36 @@ def wait_for_route(cfg: Config) -> dict[str, Any]:
     raise SystemExit(f"timed out waiting for route {cfg.coderun_name}; last routes body: {redact_text(last_body, cfg.secrets)}")
 
 
+def adapter_pod_from_selector(cfg: Config, selector: str) -> str | None:
+    proc = kubectl(cfg, "-n", cfg.namespace, "get", "pod", "-l", selector, "-o", "json", check=False)
+    if proc.returncode != 0:
+        return None
+    items = json.loads(proc.stdout or "{}").get("items", [])
+    items.sort(key=lambda pod: pod.get("metadata", {}).get("creationTimestamp", ""), reverse=True)
+    for pod in items:
+        names = [c.get("name") for c in pod.get("spec", {}).get("containers", [])]
+        if "hermes-presence-adapter" in names:
+            return pod.get("metadata", {}).get("name")
+    return None
+
+
 def wait_for_adapter_pod(cfg: Config) -> str | None:
-    selector = f"smoke.5dlabs.ai/run-id={cfg.run_id}"
+    # The controller-rendered Job/Pod may not preserve CR-level smoke labels.
+    # Prefer the explicit smoke label, then fall back to labels known to be
+    # applied by the CodeRun controller so live smokes can collect adapter-log
+    # evidence without guessing pod names or printing secrets.
+    selectors = [
+        f"smoke.5dlabs.ai/run-id={cfg.run_id}",
+        f"cleanup.5dlabs.ai/run={cfg.coderun_name}",
+        f"app=controller,component=code-runner,service={cfg.service}",
+    ]
     deadline = time.time() + cfg.wait_timeout
     while time.time() < deadline:
-        proc = kubectl(cfg, "-n", cfg.namespace, "get", "pod", "-l", selector, "-o", "json", check=False)
-        if proc.returncode == 0:
-            items = json.loads(proc.stdout or "{}").get("items", [])
-            for pod in items:
-                names = [c.get("name") for c in pod.get("spec", {}).get("containers", [])]
-                if "hermes-presence-adapter" in names:
-                    return pod.get("metadata", {}).get("name")
+        for selector in selectors:
+            pod_name = adapter_pod_from_selector(cfg, selector)
+            if pod_name:
+                print(f"[smoke] adapter pod discovered with selector {selector}: {pod_name}")
+                return pod_name
         time.sleep(3)
     return None
 
@@ -397,6 +416,16 @@ def live(cfg: Config) -> int:
 
     route = wait_for_route(cfg)
     worker_url = route.get("worker_url", "")
+    route_summary = {
+        "route_id": route.get("route_id"),
+        "runtime": route.get("runtime"),
+        "agent_id": route.get("agent_id"),
+        "coderun_id": route.get("coderun_id"),
+        "project_id": route.get("project_id"),
+        "task_id": route.get("task_id"),
+        "worker_url_present": bool(worker_url),
+    }
+    print(f"[smoke] route summary: {json.dumps(route_summary, sort_keys=True)}")
     if not worker_url:
         raise SystemExit(f"registered route missing worker_url: {json.dumps(route, indent=2)}")
 
