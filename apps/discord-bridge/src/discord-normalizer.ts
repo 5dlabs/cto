@@ -14,11 +14,14 @@ interface DiscordLikeUser {
 }
 
 interface DiscordLikeAttachment {
+  id?: string;
   url?: string;
   contentType?: string | null;
   content_type?: string;
   name?: string | null;
   filename?: string;
+  size?: number;
+  spoiler?: boolean;
 }
 
 interface DiscordLikeChannel {
@@ -40,6 +43,11 @@ interface DiscordLikeMessage {
     users?: unknown;
   };
   attachments?: unknown;
+  reference?: {
+    messageId?: string | null;
+    channelId?: string | null;
+    guildId?: string | null;
+  } | null;
 }
 
 function valuesFromCollection<T>(collection: unknown): T[] {
@@ -64,8 +72,11 @@ function normalizeAttachments(attachments: unknown): PresenceDiscordEvent["attac
   return valuesFromCollection<DiscordLikeAttachment>(attachments)
     .map((attachment) => ({
       url: attachment.url ?? "",
+      id: attachment.id,
       content_type: attachment.contentType ?? attachment.content_type,
       filename: attachment.name ?? attachment.filename,
+      size: attachment.size,
+      spoiler: attachment.spoiler,
     }))
     .filter((attachment) => attachment.url);
 }
@@ -111,6 +122,9 @@ export function normalizeDiscordMessage(
       channel_id: channelId,
       thread_id: isThread ? rawChannelId : undefined,
       message_id: message.id,
+      reference_message_id: message.reference?.messageId ?? undefined,
+      reference_channel_id: message.reference?.channelId ?? undefined,
+      reference_guild_id: message.reference?.guildId ?? undefined,
       user_id: message.author?.id,
       user_name: authorName,
       chat_type: isDm ? "dm" : isThread ? "thread" : "group",

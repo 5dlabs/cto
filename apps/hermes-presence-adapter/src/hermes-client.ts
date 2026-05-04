@@ -30,8 +30,11 @@ function buildHermesRun(event: PresenceInbound): HermesRunRequest {
       discord_channel_id: event.discord.channel_id,
       discord_thread_id: event.discord.thread_id ?? "",
       discord_message_id: event.discord.message_id ?? "",
-      session_key: event.session_key ?? "",
+      discord_reference_message_id: event.discord.reference_message_id ?? "",
+      discord_reference_channel_id: event.discord.reference_channel_id ?? "",
+      discord_reference_guild_id: event.discord.reference_guild_id ?? "",
       ...(event.metadata ?? {}),
+      session_key: event.session_key ?? "",
     },
     session: {
       platform: "discord",
@@ -40,6 +43,9 @@ function buildHermesRun(event: PresenceInbound): HermesRunRequest {
       user_id: event.discord.user_id,
       user_name: event.discord.user_name,
       thread_id: event.discord.thread_id,
+      home_id: event.metadata?.home_id,
+      home_route_id: event.metadata?.home_route_id,
+      route_id: event.metadata?.route_id,
     },
   };
 }

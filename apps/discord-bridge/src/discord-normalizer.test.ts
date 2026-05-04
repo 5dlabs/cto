@@ -17,7 +17,17 @@ function message(overrides: Record<string, unknown> = {}): Record<string, unknow
       ]),
     },
     attachments: new Map([
-      ["att-1", { url: "https://cdn.example/file.png", contentType: "image/png", name: "file.png" }],
+      [
+        "att-1",
+        {
+          id: "att-1",
+          url: "https://cdn.example/file.png",
+          contentType: "image/png",
+          name: "file.png",
+          size: 12345,
+          spoiler: true,
+        },
+      ],
     ]),
     ...overrides,
   };
@@ -38,7 +48,16 @@ test("normalizes guild messages into cto.presence.v1 without Discord credentials
   assert.equal(event?.discord.chat_type, "group");
   assert.equal(event?.text, "<@bot> rex please investigate");
   assert.deepEqual(event?.discord.mentioned_agent_ids, ["123456789012345678", "rex"]);
-  assert.deepEqual(event?.attachments, [{ url: "https://cdn.example/file.png", content_type: "image/png", filename: "file.png" }]);
+  assert.deepEqual(event?.attachments, [
+    {
+      id: "att-1",
+      url: "https://cdn.example/file.png",
+      content_type: "image/png",
+      filename: "file.png",
+      size: 12345,
+      spoiler: true,
+    },
+  ]);
   assert.equal(JSON.stringify(event).includes("DISCORD_BRIDGE_TOKEN"), false);
 });
 
@@ -52,6 +71,42 @@ test("normalizes thread messages with parent channel id", () => {
   assert.equal(event?.discord.thread_id, "thread-1");
   assert.equal(event?.discord.parent_channel_id, "channel-1");
   assert.equal(event?.discord.chat_type, "thread");
+});
+
+test("normalizes Discord reply reference metadata", () => {
+  const event = normalizeDiscordMessage(
+    message({
+      reference: {
+        messageId: "source-message-1",
+        channelId: "source-channel-1",
+        guildId: "guild-1",
+      },
+    }),
+    { accountId: "coder-control", defaultAgentId: "coder" },
+  );
+
+  assert.equal(event?.discord.reference_message_id, "source-message-1");
+  assert.equal(event?.discord.reference_channel_id, "source-channel-1");
+  assert.equal(event?.discord.reference_guild_id, "guild-1");
+});
+
+test("preserves empty text for attachment-only Discord messages", () => {
+  const event = normalizeDiscordMessage(message({ content: "" }), {
+    accountId: "coder-control",
+    defaultAgentId: "coder",
+  });
+
+  assert.equal(event?.text, "");
+  assert.deepEqual(event?.attachments, [
+    {
+      id: "att-1",
+      url: "https://cdn.example/file.png",
+      content_type: "image/png",
+      filename: "file.png",
+      size: 12345,
+      spoiler: true,
+    },
+  ]);
 });
 
 test("ignores bot-authored messages", () => {

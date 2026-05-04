@@ -12,13 +12,17 @@ export interface PresenceInbound {
     channel_id: string;
     thread_id?: string;
     message_id?: string;
+    reference_message_id?: string;
+    reference_channel_id?: string;
+    reference_guild_id?: string;
     user_id?: string;
     user_name?: string;
     chat_type?: "dm" | "group" | "thread";
     parent_channel_id?: string;
+    mentioned_agent_ids?: string[];
   };
   text?: string;
-  attachments?: Array<{ url: string; content_type?: string; filename?: string }>;
+  attachments?: Array<{ id?: string; url: string; content_type?: string; filename?: string; size?: number; spoiler?: boolean }>;
   metadata?: Record<string, string>;
   session_key?: string;
 }
@@ -61,6 +65,9 @@ export interface HermesRunRequest {
     user_id?: string;
     user_name?: string;
     thread_id?: string;
+    home_id?: string;
+    home_route_id?: string;
+    route_id?: string;
   };
 }
 

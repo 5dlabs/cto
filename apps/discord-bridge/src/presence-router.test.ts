@@ -252,6 +252,9 @@ test("normalized mention messages route to non-default mentioned agents", async 
 
       assert.equal(result.deliveries.length, 1);
       assert.equal((delivered[0] as PresenceInbound).agent_id, "rex");
+      assert.equal((delivered[0] as PresenceInbound).metadata?.selected_agent_id, "rex");
+      assert.equal((delivered[0] as PresenceInbound).metadata?.selection_reason, "discord_mention");
+      assert.equal((delivered[0] as PresenceInbound).metadata?.mentioned_agent_ids, "rex");
     },
   );
 });
@@ -335,6 +338,267 @@ test("unaddressed shared-channel Discord events do not fan out", async () => {
 
       assert.equal(result.deliveries.length, 0);
       assert.equal(delivered.length, 0);
+    },
+  );
+});
+
+test("derives stable session keys from Discord surfaces and forwards home metadata", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: PresenceInbound[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body as PresenceInbound);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "dm-home",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "dm-1" },
+        metadata: { route_kind: "home", home_id: "home-dm-1", home_route_id: "dm-home" },
+      });
+
+      for (const messageId of ["message-1", "message-2"]) {
+        await router.routeDiscordEvent({
+          schema: "cto.presence.v1",
+          event_type: "message",
+          discord: {
+            account_id: "discord-bot",
+            channel_id: "dm-1",
+            message_id: messageId,
+            user_id: "user-1",
+            chat_type: "dm",
+          },
+          text: "continue",
+        });
+      }
+
+      assert.equal(delivered.length, 2);
+      assert.equal(delivered[0].session_key, "discord:discord-bot:dm:user-1:dm-1");
+      assert.equal(delivered[1].session_key, delivered[0].session_key);
+      assert.equal(delivered[0].metadata?.home_id, "home-dm-1");
+      assert.equal(delivered[0].metadata?.home_route_id, "dm-home");
+      assert.equal(delivered[0].metadata?.route_id, "dm-home");
+    },
+  );
+});
+
+test("selected route provenance cannot be overwritten by event metadata", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: PresenceInbound[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body as PresenceInbound);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "selected-home",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "dm-1" },
+        metadata: { route_kind: "home", home_id: "home-dm-1", home_route_id: "selected-home" },
+      });
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        discord: {
+          account_id: "discord-bot",
+          channel_id: "dm-1",
+          message_id: "message-1",
+          user_id: "user-1",
+          chat_type: "dm",
+        },
+        metadata: { route_id: "spoofed-route", source: "synthetic-test" },
+        text: "continue",
+      });
+
+      assert.equal(result.deliveries.length, 1);
+      assert.equal(delivered.length, 1);
+      assert.equal(delivered[0].metadata?.route_id, "selected-home");
+      assert.equal(delivered[0].metadata?.source, "synthetic-test");
+    },
+  );
+});
+
+test("channel-specific DM home route beats ambient home fallback", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: PresenceInbound[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body as PresenceInbound);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "ambient-dm-fallback",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot" },
+        metadata: { route_kind: "home", home_id: "fallback-home", home_route_id: "ambient-dm-fallback" },
+      });
+      await router.registerRoute({
+        route_id: "dm-home",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "dm-1" },
+        metadata: { route_kind: "home", home_id: "home-dm-1", home_route_id: "dm-home" },
+      });
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        discord: {
+          account_id: "discord-bot",
+          channel_id: "dm-1",
+          message_id: "message-1",
+          user_id: "user-1",
+          chat_type: "dm",
+        },
+        text: "continue",
+      });
+
+      assert.equal(result.deliveries.length, 1);
+      assert.equal(result.deliveries[0].route.route_id, "dm-home");
+      assert.equal(delivered.length, 1);
+      assert.equal(delivered[0].metadata?.home_id, "home-dm-1");
+      assert.equal(delivered[0].metadata?.home_route_id, "dm-home");
+    },
+  );
+});
+
+test("explicit mention/direct agent selection overrides ambient home", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: PresenceInbound[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body as PresenceInbound);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "ambient-home",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+        metadata: { route_kind: "home" },
+      });
+      await router.registerRoute({
+        route_id: "mentioned-agent",
+        runtime: "hermes",
+        agent_id: "blaze",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+      });
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        discord: {
+          account_id: "discord-bot",
+          channel_id: "channel-1",
+          message_id: "source-message",
+          mentioned_agent_ids: ["blaze"],
+        },
+        text: "blaze please handle this",
+      });
+
+      assert.equal(result.deliveries.length, 1);
+      assert.equal(result.deliveries[0].route.route_id, "mentioned-agent");
+      assert.equal(delivered[0].agent_id, "blaze");
+    },
+  );
+});
+
+test("thread-specific home route beats parent-channel home route", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: PresenceInbound[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body as PresenceInbound);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "parent-home",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+        metadata: { route_kind: "home" },
+      });
+      await router.registerRoute({
+        route_id: "thread-home",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1", thread_id: "thread-1" },
+        metadata: { route_kind: "home" },
+      });
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        discord: {
+          account_id: "discord-bot",
+          guild_id: "guild-1",
+          channel_id: "channel-1",
+          thread_id: "thread-1",
+          message_id: "source-message",
+          chat_type: "thread",
+        },
+        text: "ambient thread message",
+      });
+
+      assert.equal(result.deliveries.length, 1);
+      assert.equal(result.deliveries[0].route.route_id, "thread-home");
+      assert.equal(delivered[0].session_key, "discord:discord-bot:guild:guild-1:thread-1");
+    },
+  );
+});
+
+test("parent-channel home route handles thread traffic when only parent channel is registered", async () => {
+  const router = createPresenceRouter(createDiscordStub(), logger, undefined, undefined, "shared-token");
+  const delivered: PresenceInbound[] = [];
+
+  await withWorker(
+    (_req, body) => {
+      delivered.push(body as PresenceInbound);
+    },
+    async (workerUrl) => {
+      await router.registerRoute({
+        route_id: "parent-home",
+        runtime: "hermes",
+        agent_id: "rex",
+        worker_url: workerUrl,
+        discord: { account_id: "discord-bot", channel_id: "channel-1" },
+        metadata: { route_kind: "home" },
+      });
+
+      const result = await router.routeDiscordEvent({
+        schema: "cto.presence.v1",
+        event_type: "message",
+        discord: {
+          account_id: "discord-bot",
+          guild_id: "guild-1",
+          channel_id: "channel-1",
+          thread_id: "thread-1",
+          message_id: "source-message",
+          chat_type: "thread",
+        },
+        text: "thread message for parent route",
+      });
+
+      assert.equal(result.deliveries.length, 1);
+      assert.equal(result.deliveries[0].route.route_id, "parent-home");
+      assert.equal(delivered[0].session_key, "discord:discord-bot:guild:guild-1:thread-1");
     },
   );
 });

@@ -94,6 +94,46 @@ test("accepts authenticated inbound events and falls back to the inbox when Herm
   }
 });
 
+test("rejects inbound metadata values that are not strings", async () => {
+  const server = createAdapterServer(config());
+  const baseUrl = await listen(server);
+  try {
+    const inbound = event();
+    Object.assign(inbound, { metadata: { route_id: "route-1", home_id: 42 } });
+
+    const response = await fetch(`${baseUrl}/presence/inbound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer shared-token" },
+      body: JSON.stringify(inbound),
+    });
+
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /metadata must be a string map/);
+  } finally {
+    await close(server);
+  }
+});
+
+test("rejects malformed attachment metadata before Hermes input", async () => {
+  const server = createAdapterServer(config());
+  const baseUrl = await listen(server);
+  try {
+    const inbound = event();
+    Object.assign(inbound, { attachments: [{ url: "https://cdn.example/file.png", size: -1 }] });
+
+    const response = await fetch(`${baseUrl}/presence/inbound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer shared-token" },
+      body: JSON.stringify(inbound),
+    });
+
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /attachments must be an array of valid attachment objects/);
+  } finally {
+    await close(server);
+  }
+});
+
 test("posts non-fatal presence status intents and sends Hermes input payloads", async () => {
   const statuses: unknown[] = [];
   const hermesRequests: unknown[] = [];
@@ -138,6 +178,9 @@ test("posts non-fatal presence status intents and sends Hermes input payloads", 
           discord_channel_id: "channel-1",
           discord_thread_id: "thread-1",
           discord_message_id: "message-1",
+          discord_reference_message_id: "",
+          discord_reference_channel_id: "",
+          discord_reference_guild_id: "",
           session_key: "",
         },
         session: {
@@ -153,5 +196,137 @@ test("posts non-fatal presence status intents and sends Hermes input payloads", 
     await close(adapterServer);
     await close(hermesServer);
     await close(presenceServer);
+  }
+});
+
+test("forwards deterministic session and home route metadata to Hermes input", async () => {
+  const hermesRequests: unknown[] = [];
+  const hermesServer = createServer((req, res) => {
+    void (async () => {
+      hermesRequests.push(await readJson(req));
+      res.writeHead(202, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ id: "run-1", status: "accepted" }));
+    })();
+  });
+  const hermesUrl = await listen(hermesServer);
+  const adapterServer = createAdapterServer(config({ hermesInputUrl: `${hermesUrl}/input` }));
+  const adapterUrl = await listen(adapterServer);
+  try {
+    const inbound = event();
+    inbound.session_key = "discord:discord-bot:guild:guild-1:thread-1";
+    inbound.metadata = { route_id: "thread-home", home_id: "home-thread-1", home_route_id: "thread-home" };
+
+    const response = await fetch(`${adapterUrl}/presence/inbound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer shared-token" },
+      body: JSON.stringify(inbound),
+    });
+
+    assert.equal(response.status, 202);
+    assert.equal(hermesRequests.length, 1);
+    assert.equal(
+      (hermesRequests[0] as { metadata: Record<string, string> }).metadata.session_key,
+      "discord:discord-bot:guild:guild-1:thread-1",
+    );
+    assert.deepEqual((hermesRequests[0] as { session: Record<string, string> }).session, {
+      platform: "discord",
+      chat_id: "thread-1",
+      chat_type: "thread",
+      user_id: "user-1",
+      thread_id: "thread-1",
+      home_id: "home-thread-1",
+      home_route_id: "thread-home",
+      route_id: "thread-home",
+    });
+  } finally {
+    await close(adapterServer);
+    await close(hermesServer);
+  }
+});
+
+test("forwards Discord reply reference metadata to Hermes input", async () => {
+  const hermesRequests: unknown[] = [];
+  const hermesServer = createServer((req, res) => {
+    void (async () => {
+      hermesRequests.push(await readJson(req));
+      res.writeHead(202, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ id: "run-1", status: "accepted" }));
+    })();
+  });
+  const hermesUrl = await listen(hermesServer);
+  const adapterServer = createAdapterServer(config({ hermesInputUrl: `${hermesUrl}/input` }));
+  const adapterUrl = await listen(adapterServer);
+  try {
+    const inbound = event();
+    inbound.discord.reference_message_id = "source-message-1";
+    inbound.discord.reference_channel_id = "source-channel-1";
+    inbound.discord.reference_guild_id = "guild-1";
+    inbound.discord.mentioned_agent_ids = ["123456789012345678", "rex"];
+    inbound.metadata = {
+      selected_agent_id: "rex",
+      selection_reason: "discord_mention",
+      mentioned_agent_ids: "123456789012345678,rex",
+      route_id: "mention-route",
+    };
+
+    const response = await fetch(`${adapterUrl}/presence/inbound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer shared-token" },
+      body: JSON.stringify(inbound),
+    });
+
+    assert.equal(response.status, 202);
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_message_id, "source-message-1");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_channel_id, "source-channel-1");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.discord_reference_guild_id, "guild-1");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.selected_agent_id, "rex");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.selection_reason, "discord_mention");
+    assert.equal((hermesRequests[0] as { metadata: Record<string, string> }).metadata.mentioned_agent_ids, "123456789012345678,rex");
+  } finally {
+    await close(adapterServer);
+    await close(hermesServer);
+  }
+});
+
+test("forwards attachment-only Discord messages to Hermes input with placeholder text", async () => {
+  const hermesRequests: unknown[] = [];
+  const hermesServer = createServer((req, res) => {
+    void (async () => {
+      hermesRequests.push(await readJson(req));
+      res.writeHead(202, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ id: "run-1", status: "accepted" }));
+    })();
+  });
+  const hermesUrl = await listen(hermesServer);
+  const adapterServer = createAdapterServer(config({ hermesInputUrl: `${hermesUrl}/input` }));
+  const adapterUrl = await listen(adapterServer);
+  try {
+    const inbound = event();
+    inbound.text = "";
+    inbound.attachments = [
+      {
+        id: "att-1",
+        url: "https://cdn.example/file.png",
+        content_type: "image/png",
+        filename: "file.png",
+        size: 12345,
+        spoiler: true,
+      },
+    ];
+
+    const response = await fetch(`${adapterUrl}/presence/inbound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer shared-token" },
+      body: JSON.stringify(inbound),
+    });
+
+    assert.equal(response.status, 202);
+    assert.equal(
+      (hermesRequests[0] as { input: string }).input,
+      "(The user sent a message with no text content)\n\nAttachments:\n- file.png: https://cdn.example/file.png",
+    );
+  } finally {
+    await close(adapterServer);
+    await close(hermesServer);
   }
 });

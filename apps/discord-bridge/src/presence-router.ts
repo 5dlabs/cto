@@ -31,6 +31,30 @@ function normalizeWorkerEndpoint(workerUrl: string): string {
   return trimmed.endsWith("/presence/inbound") ? trimmed : `${trimmed}/presence/inbound`;
 }
 
+function stableSurfaceSessionKey(discord: PresenceDiscordEvent["discord"]): string {
+  const surfaceId = discord.thread_id ?? discord.channel_id;
+  const scope = discord.guild_id ? `guild:${discord.guild_id}` : `dm:${discord.user_id ?? surfaceId}`;
+  return `discord:${discord.account_id}:${scope}:${surfaceId}`;
+}
+
+function isHomeRoute(route: PresenceRoute): boolean {
+  const value = route.metadata?.route_kind ?? route.metadata?.home ?? route.metadata?.is_home;
+  return value === "home" || value === "true" || value === "1";
+}
+
+function hasDiscordSelector(event: PresenceDiscordEvent): boolean {
+  return Boolean(event.agent_id || event.discord.mentioned_agent_ids?.length);
+}
+
+function routeMatchesDiscordSurface(route: PresenceRoute, event: PresenceDiscordEvent): boolean {
+  const routeDiscord = route.discord;
+  if (routeDiscord?.account_id && routeDiscord.account_id !== event.discord.account_id) return false;
+  if (routeDiscord?.guild_id && routeDiscord.guild_id !== event.discord.guild_id) return false;
+  if (routeDiscord?.channel_id && routeDiscord.channel_id !== event.discord.channel_id) return false;
+  if (routeDiscord?.thread_id && routeDiscord.thread_id !== event.discord.thread_id) return false;
+  return true;
+}
+
 function routeScore(route: PresenceRoute, event: PresenceInbound): number {
   let score = 0;
   if (route.runtime !== event.runtime) return -1;
@@ -53,8 +77,9 @@ function routeScore(route: PresenceRoute, event: PresenceInbound): number {
 function routeDiscordScore(route: PresenceRoute, event: PresenceDiscordEvent): number {
   let score = 0;
   const mentioned = event.discord.mentioned_agent_ids;
+  const explicitSelector = hasDiscordSelector(event);
   if (mentioned?.length && !mentioned.includes(route.agent_id)) return -1;
-  if (!mentioned?.length && !event.agent_id) return -1;
+  if (!explicitSelector && !isHomeRoute(route)) return -1;
   if (event.agent_id && route.agent_id !== event.agent_id) return -1;
 
   if (route.coderun_id && event.coderun_id && route.coderun_id === event.coderun_id) score += 100;
@@ -62,18 +87,46 @@ function routeDiscordScore(route: PresenceRoute, event: PresenceDiscordEvent): n
   if (route.task_id && event.task_id && route.task_id === event.task_id) score += 20;
 
   const routeDiscord = route.discord;
-  if (routeDiscord?.account_id && routeDiscord.account_id !== event.discord.account_id) return -1;
-  if (routeDiscord?.guild_id && routeDiscord.guild_id !== event.discord.guild_id) return -1;
-  if (routeDiscord?.channel_id && routeDiscord.channel_id !== event.discord.channel_id) return -1;
-  if (routeDiscord?.thread_id && routeDiscord.thread_id !== event.discord.thread_id) return -1;
+  if (!routeMatchesDiscordSurface(route, event)) return -1;
 
   if (routeDiscord?.guild_id) score += 10;
   if (routeDiscord?.channel_id) score += 30;
   if (routeDiscord?.thread_id) score += 40;
+  if (isHomeRoute(route)) score += 5;
   return score;
 }
 
+function selectionMetadata(event: PresenceDiscordEvent, route: PresenceRoute): Record<string, string> {
+  if (event.agent_id) {
+    return {
+      selected_agent_id: route.agent_id,
+      selection_reason: "event_agent_id",
+    };
+  }
+
+  if (event.discord.mentioned_agent_ids?.length) {
+    return {
+      selected_agent_id: route.agent_id,
+      selection_reason: "discord_mention",
+      mentioned_agent_ids: event.discord.mentioned_agent_ids.join(","),
+    };
+  }
+
+  if (isHomeRoute(route)) {
+    return {
+      selected_agent_id: route.agent_id,
+      selection_reason: "home_route",
+    };
+  }
+
+  return {
+    selected_agent_id: route.agent_id,
+    selection_reason: "route_match",
+  };
+}
+
 function eventForRoute(event: PresenceDiscordEvent, route: PresenceRoute): PresenceInbound {
+  const sessionKey = route.session_key ?? stableSurfaceSessionKey(event.discord);
   return {
     ...event,
     runtime: route.runtime,
@@ -81,7 +134,13 @@ function eventForRoute(event: PresenceDiscordEvent, route: PresenceRoute): Prese
     project_id: event.project_id ?? route.project_id,
     task_id: event.task_id ?? route.task_id,
     coderun_id: event.coderun_id ?? route.coderun_id,
-    session_key: route.session_key,
+    metadata: {
+      ...(route.metadata ?? {}),
+      ...(event.metadata ?? {}),
+      ...selectionMetadata(event, route),
+      route_id: route.route_id,
+    },
+    session_key: sessionKey,
   };
 }
 
@@ -154,7 +213,14 @@ export function createPresenceRouter(
         "Content-Type": "application/json",
         ...(workerSharedToken ? { Authorization: `Bearer ${workerSharedToken}` } : {}),
       },
-      body: JSON.stringify({ ...event, session_key: route.session_key }),
+      body: JSON.stringify({
+        ...event,
+        metadata: {
+          ...(route.metadata ?? {}),
+          ...(event.metadata ?? {}),
+        },
+        session_key: route.session_key ?? event.session_key,
+      }),
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
@@ -258,8 +324,13 @@ export function createPresenceRouter(
         .map((route) => ({ route, score: routeDiscordScore(route, event) }))
         .filter((entry) => entry.score > 0)
         .sort((a, b) => b.score - a.score);
+      const selected = hasDiscordSelector(event)
+        ? candidates
+        : candidates[0]
+          ? candidates.filter((entry) => entry.score === candidates[0].score)
+          : [];
       const deliveries: Array<{ route: PresenceRoute; workerStatus: number }> = [];
-      for (const { route } of candidates) {
+      for (const { route } of selected) {
         const inbound = eventForRoute(event, route);
         fabric?.publishInbound(inbound, route);
         const workerStatus = await postToWorker(route, inbound);

@@ -5,8 +5,11 @@ export type PresenceStatusState = "started" | "running" | "blocked" | "done" | "
 
 export interface PresenceAttachment {
   url: string;
+  id?: string;
   content_type?: string;
   filename?: string;
+  size?: number;
+  spoiler?: boolean;
 }
 
 export interface PresenceDiscordContext {
@@ -15,6 +18,9 @@ export interface PresenceDiscordContext {
   channel_id: string;
   thread_id?: string;
   message_id?: string;
+  reference_message_id?: string;
+  reference_channel_id?: string;
+  reference_guild_id?: string;
   user_id?: string;
   user_name?: string;
   chat_type?: PresenceChatType;
@@ -64,13 +70,15 @@ export interface PresenceRoute {
   coderun_id?: string;
   discord?: Partial<PresenceDiscordContext>;
   session_key?: string;
+  metadata?: Record<string, string>;
   created_at?: string;
   updated_at?: string;
 }
 
+type ValidationError = { ok: false; error: string };
 export type ValidationResult<T> =
   | { ok: true; value: T }
-  | { ok: false; error: string };
+  | ValidationError;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -83,7 +91,40 @@ function stringField(obj: Record<string, unknown>, key: string): string | undefi
 
 function optionalStringField(obj: Record<string, unknown>, key: string): string | undefined {
   const value = obj[key];
-  return typeof value === "string" && value.trim() ? value : undefined;
+  return typeof value === "string" ? value : undefined;
+}
+
+function stringMapField(obj: Record<string, unknown>, key: string): ValidationResult<Record<string, string> | undefined> {
+  const value = obj[key];
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+  if (!isRecord(value) || !Object.values(value).every((item) => typeof item === "string")) {
+    return { ok: false, error: `${key} must be a string map` };
+  }
+  return { ok: true, value: value as Record<string, string> };
+}
+
+function validateAttachments(value: unknown): ValidationResult<PresenceAttachment[] | undefined> {
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+  if (
+    !Array.isArray(value) ||
+    !value.every(
+      (item) =>
+        isRecord(item) &&
+        typeof item.url === "string" &&
+        (item.id === undefined || typeof item.id === "string") &&
+        (item.content_type === undefined || typeof item.content_type === "string") &&
+        (item.filename === undefined || typeof item.filename === "string") &&
+        (item.size === undefined || (typeof item.size === "number" && item.size >= 0)) &&
+        (item.spoiler === undefined || typeof item.spoiler === "boolean"),
+    )
+  ) {
+    return { ok: false, error: "attachments must be an array of valid attachment objects" };
+  }
+  return { ok: true, value: value as PresenceAttachment[] };
 }
 
 function isPresenceRuntime(value: unknown): value is PresenceRuntime {
@@ -121,6 +162,9 @@ function validateDiscordContext(value: unknown): ValidationResult<PresenceDiscor
       guild_id: optionalStringField(value, "guild_id"),
       thread_id: optionalStringField(value, "thread_id"),
       message_id: optionalStringField(value, "message_id"),
+      reference_message_id: optionalStringField(value, "reference_message_id"),
+      reference_channel_id: optionalStringField(value, "reference_channel_id"),
+      reference_guild_id: optionalStringField(value, "reference_guild_id"),
       user_id: optionalStringField(value, "user_id"),
       user_name: optionalStringField(value, "user_name"),
       chat_type: chatType as PresenceChatType | undefined,
@@ -141,16 +185,18 @@ export function validatePresenceDiscordEvent(payload: unknown): ValidationResult
     return { ok: false, error: "event_type must be message, interaction, thread, or lifecycle" };
   }
   const discord = validateDiscordContext(payload.discord);
-  if (!discord.ok) {
+  if (discord.ok === false) {
     return { ok: false, error: discord.error };
   }
 
-  const attachments = payload.attachments;
-  if (
-    attachments !== undefined &&
-    (!Array.isArray(attachments) || !attachments.every((item) => isRecord(item) && typeof item.url === "string"))
-  ) {
-    return { ok: false, error: "attachments must be an array of objects with url" };
+  const attachments = validateAttachments(payload.attachments);
+  if (attachments.ok === false) {
+    return { ok: false, error: attachments.error };
+  }
+
+  const metadata = stringMapField(payload, "metadata");
+  if (metadata.ok === false) {
+    return { ok: false, error: metadata.error };
   }
 
   return {
@@ -164,8 +210,8 @@ export function validatePresenceDiscordEvent(payload: unknown): ValidationResult
       coderun_id: optionalStringField(payload, "coderun_id"),
       discord: discord.value,
       text: optionalStringField(payload, "text"),
-      attachments: attachments as PresenceAttachment[] | undefined,
-      metadata: isRecord(payload.metadata) ? (payload.metadata as Record<string, string>) : undefined,
+      attachments: attachments.value,
+      metadata: metadata.value,
     },
   };
 }
@@ -188,16 +234,18 @@ export function validatePresenceInbound(payload: unknown): ValidationResult<Pres
     return { ok: false, error: "agent_id is required" };
   }
   const discord = validateDiscordContext(payload.discord);
-  if (!discord.ok) {
+  if (discord.ok === false) {
     return { ok: false, error: discord.error };
   }
 
-  const attachments = payload.attachments;
-  if (
-    attachments !== undefined &&
-    (!Array.isArray(attachments) || !attachments.every((item) => isRecord(item) && typeof item.url === "string"))
-  ) {
-    return { ok: false, error: "attachments must be an array of objects with url" };
+  const attachments = validateAttachments(payload.attachments);
+  if (attachments.ok === false) {
+    return { ok: false, error: attachments.error };
+  }
+
+  const metadata = stringMapField(payload, "metadata");
+  if (metadata.ok === false) {
+    return { ok: false, error: metadata.error };
   }
 
   return {
@@ -212,8 +260,8 @@ export function validatePresenceInbound(payload: unknown): ValidationResult<Pres
       coderun_id: optionalStringField(payload, "coderun_id"),
       discord: discord.value,
       text: optionalStringField(payload, "text"),
-      attachments: attachments as PresenceAttachment[] | undefined,
-      metadata: isRecord(payload.metadata) ? (payload.metadata as Record<string, string>) : undefined,
+      attachments: attachments.value,
+      metadata: metadata.value,
     },
   };
 }
@@ -234,6 +282,11 @@ export function validatePresenceRoute(payload: unknown): ValidationResult<Presen
     optionalStringField(payload, "coderun_id") ??
     `${payload.runtime}:${agentId}:${Date.now()}`;
 
+  const metadata = stringMapField(payload, "metadata");
+  if (metadata.ok === false) {
+    return { ok: false, error: metadata.error };
+  }
+
   return {
     ok: true,
     value: {
@@ -246,6 +299,7 @@ export function validatePresenceRoute(payload: unknown): ValidationResult<Presen
       coderun_id: optionalStringField(payload, "coderun_id"),
       discord: isRecord(payload.discord) ? (payload.discord as Partial<PresenceDiscordContext>) : undefined,
       session_key: optionalStringField(payload, "session_key"),
+      metadata: metadata.value,
     },
   };
 }
