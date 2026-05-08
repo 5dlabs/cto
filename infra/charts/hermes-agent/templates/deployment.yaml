@@ -334,14 +334,22 @@ spec:
               # ---------------------------------------------------------------
               export HOME=/workspace
               echo "[plugin] discord: ensuring @openclaw/discord is installed"
-              if ! OPENCLAW_CONFIG=/tmp/openclaw-plugin-bootstrap.json openclaw plugins inspect discord >/dev/null 2>&1; then
-                if OPENCLAW_CONFIG=/tmp/openclaw-plugin-bootstrap.json openclaw plugins install @openclaw/discord 2>&1 | tail -8; then
+              if OPENCLAW_CONFIG=/tmp/openclaw-plugin-bootstrap.json openclaw plugins inspect discord >/dev/null 2>&1; then
+                echo "[plugin] discord: already installed"
+              else
+                echo "[plugin] discord: installing/repairing @openclaw/discord"
+                if OPENCLAW_CONFIG=/tmp/openclaw-plugin-bootstrap.json openclaw plugins install @openclaw/discord --force --pin 2>&1 | tail -8; then
                   echo "[plugin] discord: installed"
                 else
                   echo "[plugin] discord: install failed"
                 fi
-              else
-                echo "[plugin] discord: already installed"
+              fi
+              # Some OpenClaw/Discord version skews leave a source-only npm
+              # package cached in the persistent workspace. Repair that cache so
+              # gateway startup finds dist/index.js and dist/setup-entry.js.
+              if ! OPENCLAW_CONFIG=/tmp/openclaw-plugin-bootstrap.json openclaw plugins inspect discord >/dev/null 2>&1; then
+                echo "[plugin] discord: retrying forced repair after failed inspect"
+                OPENCLAW_CONFIG=/tmp/openclaw-plugin-bootstrap.json openclaw plugins install @openclaw/discord --force --pin 2>&1 | tail -8 || true
               fi
               cd /workspace
               {{- end }}
