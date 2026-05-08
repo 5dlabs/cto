@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/component: control-plane-builder
     app.kubernetes.io/part-of: cto-platform
     app.kubernetes.io/managed-by: gitops
-    app.kubernetes.io/version: v2026.4.23
+    app.kubernetes.io/version: v2026.5.7
 spec:
   replicas: 1
   selector:
@@ -35,7 +35,7 @@ spec:
         fsGroup: 10000
       initContainers:
         - name: write-hermes-config
-          image: docker.io/nousresearch/hermes-agent:v2026.4.23
+          image: docker.io/nousresearch/hermes-agent:v2026.5.7
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0
@@ -198,7 +198,7 @@ spec:
               mountPath: /opt/data
       containers:
         - name: hermes
-          image: docker.io/nousresearch/hermes-agent:v2026.4.23
+          image: docker.io/nousresearch/hermes-agent:v2026.5.7
           imagePullPolicy: IfNotPresent
           command:
             - sh
