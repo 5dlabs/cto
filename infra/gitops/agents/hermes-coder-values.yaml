@@ -22,6 +22,29 @@ gateway:
 agent:
   id: hermes-coder
   name: "Hermes Coder"
+  model: "github-copilot/gpt-5.5"
+
+modelDefaults:
+  primary: "github-copilot/gpt-5.5"
+  fallbacks:
+    - "github-copilot/gpt-5.5"
+
+models:
+  providers:
+    anthropic:
+      enabled: false
+    github-copilot:
+      enabled: true
+      api: "github-copilot"
+      auth: "oauth"
+      baseUrl: "https://api.githubcopilot.com"
+      # Uses COPILOT_GITHUB_TOKEN/GITHUB_TOKEN from cto-coder-api-keys at runtime;
+      # do not put token values in Git.
+      apiKeySecretKey: "github-pat"
+      authHeader: false
+      models:
+        - id: "gpt-5.5"
+          name: "GPT-5.5 (GitHub Copilot)"
 
 # Use the public agents image (same as openclaw-coder); the default
 # registry.5dlabs.ai/5dlabs/openclaw image requires auth.
