@@ -11,16 +11,27 @@ import { RuntimeStep } from '@/components/setup/RuntimeStep'
 import { InstallStep } from '@/components/setup/InstallStep'
 import { DeployStep } from '@/components/setup/DeployStep'
 import { Download, Rocket } from 'lucide-react'
-import { 
+import {
   CheckCircle2,
-  Container, 
-  Github, 
-  Cloud, 
-  Key, 
+  Container,
+  Github,
+  Cloud,
+  Key,
   Settings2,
   Loader2,
   ExternalLink
 } from 'lucide-react'
+
+const CREDENTIAL_PROVIDERS = [
+  {
+    title: 'Secrets',
+    items: ['1Password'],
+  },
+  {
+    title: 'Cloudflare',
+    items: ['Cloudflare'],
+  },
+]
 
 interface SetupWizardProps {
   initialStep: number
@@ -30,9 +41,9 @@ interface SetupWizardProps {
 const STEPS = [
   { id: 0, name: 'runtime', title: 'Container Runtime', icon: Container },
   { id: 1, name: 'stack', title: 'Choose Your Stack', icon: Settings2 },
-  { id: 2, name: 'api_keys', title: 'API Keys', icon: Key },
+  { id: 2, name: 'secrets', title: 'Secrets', icon: Key },
   { id: 3, name: 'github', title: 'GitHub Connection', icon: Github },
-  { id: 4, name: 'cloudflare', title: 'Cloudflare Tunnel', icon: Cloud },
+  { id: 4, name: 'cloudflare', title: 'Cloudflare', icon: Cloud },
   { id: 5, name: 'install', title: 'Create Cluster', icon: Download },
   { id: 6, name: 'deploy', title: 'Deploy CTO', icon: Rocket },
 ]
@@ -241,6 +252,23 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
               Enter your {cli === 'codex' ? 'OpenAI' : 'Anthropic'} API key.
               This is stored securely in your system keychain.
             </p>
+            <div className="grid grid-cols-2 gap-4">
+              {CREDENTIAL_PROVIDERS.map((provider) => (
+                <div key={provider.title} className="rounded-lg border bg-muted/20 p-4">
+                  <div className="mb-3 text-sm font-semibold">{provider.title}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {provider.items.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-md bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
             <div className="space-y-2">
               <Label htmlFor="apiKey">
                 {cli === 'codex' ? 'OpenAI' : 'Anthropic'} API Key

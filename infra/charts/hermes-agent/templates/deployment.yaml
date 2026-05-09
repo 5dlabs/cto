@@ -438,9 +438,11 @@ spec:
               export GIT_TERMINAL_PROMPT=0
 
               if [ -n "${GITHUB_TOKEN:-}" ]; then
-                # Credential store with entries for github.com
-                echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > /workspace/.git-credentials
-                chmod 644 /workspace/.git-credentials
+                # Credential store with entries for github.com. Do not log this file: it contains
+                # the real token so non-interactive private repo clones can succeed.
+                umask 077
+                printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" > /workspace/.git-credentials
+                chmod 600 /workspace/.git-credentials
                 chown 1001:1000 /workspace/.git-credentials
 
                 git config --global credential.helper 'store --file=/workspace/.git-credentials'
