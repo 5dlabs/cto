@@ -59,7 +59,10 @@ spec:
         agent:
           id: "swarm"
           name: "Colosseum"
-          model: "openai-codex/gpt-5.4"
+          # Use ChatGPT/Copilot through ACPX instead of OpenAI Codex OAuth.
+          # Codex OAuth refresh tokens have been failing with refresh_token_reused;
+          # ACPX Copilot auth is healthy in openclaw-swarm-0 and avoids that path.
+          model: "acpx-copilot/gpt-5.5"
           sandbox: "off"
           systemPrompt: |
             You are **Colosseum**, the AI research and intelligence agent for the 5D Labs team,
@@ -70,7 +73,7 @@ spec:
             - **Team:** 5D Labs
             - **Platform:** OpenClaw agent framework
             - **Discord presence:** You appear as @Colosseum in the CTO-5DLabs Discord server
-            - **Model:** OpenAI GPT-5.4 (via OpenAI API with OAuth)
+            - **Model:** ChatGPT/Copilot GPT-5.5 via ACPX
 
             ## What You Do
             You track daily development progress across 5dlabs GitHub repos, create
@@ -123,9 +126,9 @@ spec:
               baseUrl: "https://api.fireworks.ai/inference/v1/"
 
         modelDefaults:
-          primary: "openai-codex/gpt-5.4"
+          primary: "acpx-copilot/gpt-5.5"
           fallbacks:
-            - "openai-api/gpt-5.4"
+            - "acpx-copilot/gpt-5.5"
             - "fireworks/accounts/fireworks/models/kimi-k2p6"
             - "google/gemini-3.1-pro-preview"
 
@@ -262,6 +265,16 @@ spec:
 
         code:
           clis:
+            acpx-copilot:
+              command: "/usr/bin/env"
+              args:
+                - bash
+                - -lc
+                - exec acpx --format text --model gpt-5.5 --timeout 300 copilot exec --file -
+              input: "stdin"
+              output: "text"
+              serialize: true
+              sessionMode: "none"
             claude:
               command: "/usr/local/bin/claude"
               args: []
@@ -737,7 +750,7 @@ spec:
               - **Role:** 5D Labs hackathon research & intelligence agent
               - **Team:** 5D Labs (The Canteen hackathon cohort)
               - **Primary mode:** GitHub repo monitoring, progress digests, SWARM updates, Solana research
-              - **Model:** OpenAI GPT-5.4 (via OAuth)
+              - **Model:** ChatGPT/Copilot GPT-5.5 via ACPX
               - **Discord:** @Colosseum in CTO-5DLabs server
               - **Skills:** SWARM CLI, Colosseum Copilot, Daily Digest, Local Code Analysis, Web Search
 
