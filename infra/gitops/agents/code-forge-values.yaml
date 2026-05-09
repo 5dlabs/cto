@@ -1,8 +1,8 @@
 # =============================================================================
-# Code Avatar OpenClaw Agent — Per-Agent Values Override
+# Code Forge Agent — Per-Agent Values Override
 # =============================================================================
 # Multipurpose Coder-class Discord bot cloned from hermes-coder-values.yaml.
-# Uses the existing openclaw-discord-tokens[avatar-openclaw] key; no token values
+# Uses the OpenClaw Discord Scout token synced as openclaw-discord-tokens[code-forge]; no token values
 # are stored in Git. Keep runtime/model/settings aligned with Hermes Coder.
 # =============================================================================
 
@@ -17,8 +17,8 @@ gateway:
   runAsMain: true
 
 agent:
-  id: code-avatar-openclaw
-  name: "Code Avatar OpenClaw"
+  id: code-forge
+  name: "Code Forge"
   # Route through ACPX/Copilot CLI instead of OpenClaw's built-in
   # github-copilot provider. The built-in token exchange started returning
   # HTTP 404 after the upgrade, while ACPX Copilot continues to authenticate
@@ -59,14 +59,13 @@ image:
 nats:
   enabled: false
 
-# Enable the Discord gateway for the regular Coder bot. The chart renders
-# DISCORD_TOKEN from openclaw-discord-tokens[avatar-openclaw] at runtime; do not put
+# Enable the Discord gateway for a coder-class bot. The chart renders
+# DISCORD_TOKEN from openclaw-discord-tokens[code-forge] at runtime; do not put
 # token values in Git.
 messaging:
   discord:
     enabled: true
-    tokenSecretKey: avatar-openclaw
-    allowBots: mentions
+    tokenSecretKey: code-forge
     groupPolicy: allowlist
     dmPolicy: allowlist
     allowFrom:
@@ -89,7 +88,7 @@ messaging:
       spawnAcpSessions: true
 
 codexPlugin:
-  # The Code Avatar OpenClaw gateway image does not currently ship an OpenClaw codex
+  # The Code Forge gateway image does not currently ship an OpenClaw codex
   # plugin package; leaving the stale plugin enabled creates config warnings.
   enabled: false
 
@@ -105,7 +104,7 @@ probes:
   readiness:
     enabled: false
 
-# Persist the intake runtime defaults through the Argo-managed Code Avatar OpenClaw
+# Persist the intake runtime defaults through the Argo-managed Code Forge
 # application. Smoke/debug runs from this pod should route every intake LLM
 # entity through the universal ACPX backend and GitHub Copilot GPT-5.5 rather
 # than falling back to Gemini, direct API keys, or OpenClaw gateway defaults.

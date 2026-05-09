@@ -1,6 +1,6 @@
 ---
 # =============================================================================
-# Code Metal Agent — ArgoCD Application
+# Code Keeper Agent — ArgoCD Application
 # =============================================================================
 # Deploys a multipurpose Coder-class agent in the cto namespace. Runtime settings
 # intentionally mirror cto-hermes-coder; only the agent identity and existing
@@ -9,10 +9,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cto-code-forge
+  name: cto-code-keeper
   namespace: argocd
   labels:
-    app.kubernetes.io/name: cto-code-forge
+    app.kubernetes.io/name: cto-code-keeper
     app.kubernetes.io/part-of: cto-platform
     app.kubernetes.io/component: coder
   annotations:
@@ -27,9 +27,9 @@ spec:
       targetRevision: main
       path: infra/charts/hermes-agent
       helm:
-        releaseName: code-forge
+        releaseName: code-keeper
         valueFiles:
-          - ../../gitops/agents/code-metal-values.yaml
+          - ../../gitops/agents/code-keeper-values.yaml
 
   destination:
     server: https://kubernetes.default.svc
