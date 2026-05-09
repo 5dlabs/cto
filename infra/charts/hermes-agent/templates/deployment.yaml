@@ -469,7 +469,10 @@ spec:
                 echo "[git] WARNING: GITHUB_TOKEN not set — private repo clones may fail"
               fi
 
-              # Reset HOME for remaining init steps (root context)
+              # Keep the /workspace gitconfig active for the repo clone/audit phase.
+              # HOME is reset for root-owned init steps, so pin Git's global config
+              # explicitly; otherwise private repo clones ignore the credential helper.
+              export GIT_CONFIG_GLOBAL=/workspace/.gitconfig
               export HOME=/root
 
               # ---------------------------------------------------------------
