@@ -2,7 +2,7 @@
 # Code Keeper Agent — Per-Agent Values Override
 # =============================================================================
 # Multipurpose Coder-class Discord bot cloned from hermes-coder-values.yaml.
-# Uses the OpenClaw Discord token synced as openclaw-discord-tokens[code-keeper]; no token values
+# Uses the OpenClaw Discord Review token synced as openclaw-discord-tokens[code-keeper]; no token values
 # are stored in Git. Keep runtime/model/settings aligned with Hermes Coder.
 # =============================================================================
 
