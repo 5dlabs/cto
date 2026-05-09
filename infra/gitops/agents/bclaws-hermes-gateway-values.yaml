@@ -5,6 +5,11 @@
 nameOverride: ""
 fullnameOverride: "bclaws-hermes-gateway"
 
+# Disabled 2026-05-09: Bclaws is intentionally offline while regular Coder is the only active coder bot.
+# Keep the Argo app/source in place, but render no Kubernetes runtime resources.
+enabled: false
+disableReason: "Bclaws is paused; regular Coder owns the active coder lane."
+
 image:
   repository: docker.io/nousresearch/hermes-agent
   tag: v2026.4.23
