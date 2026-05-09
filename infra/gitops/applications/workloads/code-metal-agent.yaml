@@ -9,10 +9,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cto-code-metal
+  name: cto-code-forge
   namespace: argocd
   labels:
-    app.kubernetes.io/name: cto-code-metal
+    app.kubernetes.io/name: cto-code-forge
     app.kubernetes.io/part-of: cto-platform
     app.kubernetes.io/component: coder
   annotations:
@@ -27,7 +27,7 @@ spec:
       targetRevision: main
       path: infra/charts/hermes-agent
       helm:
-        releaseName: code-metal
+        releaseName: code-forge
         valueFiles:
           - ../../gitops/agents/code-metal-values.yaml
 
