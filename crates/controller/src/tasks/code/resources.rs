@@ -499,12 +499,12 @@ fn is_morgan_code_run(code_run: &CodeRun) -> bool {
         .spec
         .implementation_agent
         .as_deref()
-        .map_or(false, |agent| agent.eq_ignore_ascii_case("morgan"))
+        .is_some_and(|agent| agent.eq_ignore_ascii_case("morgan"))
         || code_run
             .spec
             .github_app
             .as_deref()
-            .map_or(false, |app| app.eq_ignore_ascii_case("5dlabs-morgan"))
+            .is_some_and(|app| app.eq_ignore_ascii_case("5dlabs-morgan"))
 }
 
 fn build_morgan_sidecar_spec(
