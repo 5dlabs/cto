@@ -24,6 +24,18 @@ agent:
   # HTTP 404 after the upgrade, while ACPX Copilot continues to authenticate
   # from the existing secret-backed environment.
   model: "acpx-copilot/gpt-5.5"
+  heartbeat:
+    every: "15m"
+    target: "last"
+    ackMaxChars: 800
+    prompt: >-
+      Read /workspace/HEARTBEAT.md and /workspace/HANDOFF.md if they exist.
+      If clear work is in flight, keep implementing autonomously. Update the
+      handoff progress ledger after each iteration. If two consecutive
+      iterations do not add at least 10 percentage points of progress, stop
+      repeating diagnostics and make one concrete fix/change, then validate it.
+      Reply HEARTBEAT_OK only when there is no in-flight work and no stalled
+      watchdog action to take.
 
 modelDefaults:
   primary: "acpx-copilot/gpt-5.5"
@@ -274,11 +286,55 @@ workspace:
       validation: syntax checks, package tests/builds, `kubectl`/Argo status, and
       smoke tests where safe. Report exact commands and results without secrets.
 
+    HEARTBEAT.md: |
+      # HEARTBEAT.md — Autonomous Living Hands
+
+      This Coder-class runtime is expected to keep moving without waiting for a
+      new human prompt when a task is already in flight.
+
+      On every heartbeat or boot-continuity turn:
+
+      1. Read `/workspace/HANDOFF.md` and identify the active objective.
+      2. Inspect local evidence before speculating: git status, recent logs,
+         Kubernetes/Argo state when relevant, and the latest validation output.
+      3. Run one implementation iteration that changes the system state or
+         produces new evidence.
+      4. Update `/workspace/HANDOFF.md` with:
+         - `Iterations completed`
+         - `Percent progress estimate`
+         - `Last command(s) run`
+         - `Evidence / validation`
+         - `Blockers`
+         - `Next concrete action`
+      5. Compare the current progress estimate to the estimate from two
+         iterations ago. If progress increased by less than 10 percentage points,
+         do not loop on the same diagnostics. Make a concrete fix/change instead
+         and validate it.
+      6. Prefer GitOps changes through `/workspace/repos/cto`. Keep production
+         bots, discord-bridge, and the Hermes Coder path untouched unless the
+         active task explicitly requires them.
+
+      Use ACPX/Copilot (`acpx-copilot/gpt-5.5`) for autonomous implementation
+      work where available. Never print, paste, commit, or summarize secret
+      values.
+
     HANDOFF.md: |
       # HANDOFF.md
 
+      ## Status
+
       No task-specific handoff has been written for this generalist workspace yet.
       Check git status and the active user request before starting new work.
+
+      ## Autonomous progress ledger
+
+      - Iterations completed: 0
+      - Percent progress estimate: 0%
+      - Last command(s) run: none
+      - Evidence / validation: none yet
+      - Blockers: none known
+      - Next concrete action: read the current directive, inspect repo/cluster
+        state, then either continue in-flight work or stand by if clean.
 
 # =============================================================================
 # Coder-Generalist Tool/Skill Context
