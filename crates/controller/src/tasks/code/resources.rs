@@ -7,7 +7,7 @@ use crate::crds::{CLIConfig, CodeRun};
 use crate::tasks::cleanup::{
     LABEL_CLEANUP_KIND, LABEL_CLEANUP_RUN, LABEL_CLEANUP_SCOPE, SCOPE_RUN,
 };
-use crate::tasks::config::{ControllerConfig, PresenceConfig, ResolvedSecretBinding};
+use crate::tasks::config::{ControllerConfig, MorganSidecarConfig, PresenceConfig, ResolvedSecretBinding};
 use crate::tasks::types::{github_app_secret_name, Context, Error, Result};
 use k8s_openapi::api::{
     batch::v1::Job,
@@ -492,6 +492,79 @@ fn build_hermes_presence_adapter_env(
     }
 
     adapter_env
+}
+
+fn is_morgan_code_run(code_run: &CodeRun) -> bool {
+    code_run
+        .spec
+        .implementation_agent
+        .as_deref()
+        .map_or(false, |agent| agent.eq_ignore_ascii_case("morgan"))
+        || code_run
+            .spec
+            .github_app
+            .as_deref()
+            .map_or(false, |app| app.eq_ignore_ascii_case("5dlabs-morgan"))
+}
+
+fn build_morgan_sidecar_spec(
+    code_run: &CodeRun,
+    morgan: &MorganSidecarConfig,
+    workspace_subdir: &str,
+) -> Option<serde_json::Value> {
+    if !morgan.enabled
+        || !matches!(code_run.spec.effective_harness(), HarnessAgent::Hermes)
+        || !is_morgan_code_run(code_run)
+    {
+        return None;
+    }
+
+    let image = morgan
+        .image
+        .clone()
+        .unwrap_or_else(|| "ghcr.io/5dlabs/morgan-agent-sidecar:latest".to_string());
+    let pull_policy = if image.ends_with(":latest") || image.ends_with(":dev") {
+        "Always"
+    } else {
+        "IfNotPresent"
+    };
+    let stream_dir = format!("/workspace/{workspace_subdir}/morgan");
+    let session_id = format!("morgan_{}", code_run.name_any());
+
+    Some(json!({
+        "name": "morgan-agent-sidecar",
+        "image": image,
+        "imagePullPolicy": pull_policy,
+        "env": [
+            { "name": "CODERUN_ID", "value": code_run.name_any() },
+            { "name": "MORGAN_AGENT_ID", "value": "morgan" },
+            { "name": "MORGAN_SESSION_ID", "value": session_id },
+            { "name": "MORGAN_PROVIDER_MODE", "value": morgan.provider_mode.clone() },
+            { "name": "MORGAN_STREAM_DIR", "value": stream_dir },
+            { "name": "MORGAN_EVENT_LOG", "value": format!("/workspace/{workspace_subdir}/meet-events.jsonl") },
+            { "name": "MORGAN_COMMAND_LOG", "value": format!("/workspace/{workspace_subdir}/meet-commands.jsonl") },
+            { "name": "MORGAN_STATUS_FILE", "value": format!("/workspace/{workspace_subdir}/meet-status.json") },
+            { "name": "MORGAN_MCP_PORT", "value": morgan.mcp_port.to_string() },
+            { "name": "HTTP_PORT", "value": morgan.health_port.to_string() },
+            { "name": "WORKSPACE_DIR", "value": format!("/workspace/{workspace_subdir}") }
+        ],
+        "ports": [
+            { "containerPort": morgan.health_port, "name": "morgan-http" }
+        ],
+        "volumeMounts": [
+            { "name": "workspace", "mountPath": "/workspace" }
+        ],
+        "readinessProbe": {
+            "httpGet": { "path": "/healthz", "port": morgan.health_port },
+            "initialDelaySeconds": 2,
+            "periodSeconds": 5,
+            "failureThreshold": 12
+        },
+        "resources": {
+            "requests": { "cpu": "10m", "memory": "64Mi" },
+            "limits": { "cpu": "250m", "memory": "256Mi" }
+        }
+    }))
 }
 
 pub struct CodeResourceManager<'a> {
@@ -2168,6 +2241,19 @@ impl<'a> CodeResourceManager<'a> {
             );
         }
 
+        // Add Morgan meeting/avatar sidecar for opt-in Hermes Morgan CodeRuns.
+        // The sidecar exposes localhost HTTP/MCP-compatible endpoints and writes
+        // meet-events/commands/status streams under this run's workspace subdir.
+        if let Some(morgan_spec) =
+            build_morgan_sidecar_spec(code_run, &self.config.morgan_sidecar, &workspace_subdir)
+        {
+            containers.push(morgan_spec);
+            info!(
+                "Added Morgan agent sidecar for Hermes CodeRun {}",
+                code_run.name_any()
+            );
+        }
+
         // Add promtail sidecar for shipping CLI logs to Loki
         // Mirrors Morgan's promtail config — scrapes CLI-specific log paths
         // and ships them to the in-cluster Loki gateway via the OTLP pipeline
@@ -2528,7 +2614,8 @@ done"#
                       /workspace/{workspace_subdir}/.kimi/logs \
                       /workspace/{workspace_subdir}/.local/share/opencode/log \
                       /workspace/{workspace_subdir}/.copilot/logs \
-                      /workspace/{workspace_subdir}/.pi/logs && \
+                      /workspace/{workspace_subdir}/.pi/logs \
+                      /workspace/{workspace_subdir}/morgan && \
              chown -R 1000:1000 /workspace/runs && chmod -R ug+rwX /workspace/runs"
         );
         let mut init_containers = vec![json!({
@@ -3966,6 +4053,182 @@ mod tests {
                 }
             }))
         );
+    }
+
+    fn morgan_env_value<'a>(
+        spec: &'a serde_json::Value,
+        name: &str,
+    ) -> Option<&'a serde_json::Value> {
+        spec["env"]
+            .as_array()
+            .and_then(|env| env.iter().find(|item| item["name"] == name))
+            .and_then(|item| item.get("value").or_else(|| item.get("valueFrom")))
+    }
+
+    #[test]
+    fn morgan_sidecar_not_added_when_disabled() {
+        let mut code_run =
+            create_test_code_run_with_linear("5DLabs-Morgan", CLIType::Claude, false);
+        code_run.spec.harness_agent = Some(HarnessAgent::Hermes);
+
+        assert!(build_morgan_sidecar_spec(
+            &code_run,
+            &MorganSidecarConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            "runs/sidecar-test-run-uid",
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn morgan_sidecar_not_added_for_non_hermes_harness() {
+        let mut code_run =
+            create_test_code_run_with_linear("5DLabs-Morgan", CLIType::Claude, false);
+        code_run.spec.harness_agent = Some(HarnessAgent::OpenClaw);
+
+        assert!(build_morgan_sidecar_spec(
+            &code_run,
+            &MorganSidecarConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            "runs/sidecar-test-run-uid",
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn morgan_sidecar_not_added_for_non_morgan_identity() {
+        let mut code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, false);
+        code_run.spec.harness_agent = Some(HarnessAgent::Hermes);
+
+        assert!(build_morgan_sidecar_spec(
+            &code_run,
+            &MorganSidecarConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            "runs/sidecar-test-run-uid",
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn morgan_sidecar_added_for_hermes_morgan_github_app() {
+        let mut code_run = create_test_code_run_with_linear("5DLabs-Morgan", CLIType::Claude, false);
+        code_run.spec.harness_agent = Some(HarnessAgent::Hermes);
+
+        let spec = build_morgan_sidecar_spec(
+            &code_run,
+            &MorganSidecarConfig {
+                enabled: true,
+                image: Some("ghcr.io/5dlabs/morgan-agent-sidecar:test".to_string()),
+                provider_mode: "stub".to_string(),
+                mcp_port: 4400,
+                health_port: 4401,
+            },
+            "runs/sidecar-test-run-uid",
+        )
+        .expect("Morgan sidecar should be rendered");
+
+        assert_eq!(spec["name"], "morgan-agent-sidecar");
+        assert_eq!(spec["image"], "ghcr.io/5dlabs/morgan-agent-sidecar:test");
+        assert_eq!(spec["imagePullPolicy"], "IfNotPresent");
+        assert_eq!(
+            spec["ports"][0],
+            json!({ "containerPort": 4401, "name": "morgan-http" })
+        );
+        assert_eq!(
+            spec["volumeMounts"][0],
+            json!({ "name": "workspace", "mountPath": "/workspace" })
+        );
+        assert_eq!(
+            spec["readinessProbe"],
+            json!({
+                "httpGet": { "path": "/healthz", "port": 4401 },
+                "initialDelaySeconds": 2,
+                "periodSeconds": 5,
+                "failureThreshold": 12
+            })
+        );
+        assert_eq!(
+            spec["resources"],
+            json!({
+                "requests": { "cpu": "10m", "memory": "64Mi" },
+                "limits": { "cpu": "250m", "memory": "256Mi" }
+            })
+        );
+
+        assert_eq!(
+            morgan_env_value(&spec, "CODERUN_ID"),
+            Some(&json!("sidecar-test-run"))
+        );
+        assert_eq!(
+            morgan_env_value(&spec, "MORGAN_AGENT_ID"),
+            Some(&json!("morgan"))
+        );
+        assert_eq!(
+            morgan_env_value(&spec, "MORGAN_SESSION_ID"),
+            Some(&json!("morgan_sidecar-test-run"))
+        );
+        assert_eq!(
+            morgan_env_value(&spec, "MORGAN_PROVIDER_MODE"),
+            Some(&json!("stub"))
+        );
+        assert_eq!(
+            morgan_env_value(&spec, "MORGAN_STREAM_DIR"),
+            Some(&json!("/workspace/runs/sidecar-test-run-uid/morgan"))
+        );
+        assert_eq!(
+            morgan_env_value(&spec, "MORGAN_EVENT_LOG"),
+            Some(&json!("/workspace/runs/sidecar-test-run-uid/meet-events.jsonl"))
+        );
+        assert_eq!(
+            morgan_env_value(&spec, "MORGAN_COMMAND_LOG"),
+            Some(&json!("/workspace/runs/sidecar-test-run-uid/meet-commands.jsonl"))
+        );
+        assert_eq!(
+            morgan_env_value(&spec, "MORGAN_STATUS_FILE"),
+            Some(&json!("/workspace/runs/sidecar-test-run-uid/meet-status.json"))
+        );
+        assert_eq!(morgan_env_value(&spec, "MORGAN_MCP_PORT"), Some(&json!("4400")));
+        assert_eq!(morgan_env_value(&spec, "HTTP_PORT"), Some(&json!("4401")));
+        assert_eq!(
+            morgan_env_value(&spec, "WORKSPACE_DIR"),
+            Some(&json!("/workspace/runs/sidecar-test-run-uid"))
+        );
+
+        assert!(
+            morgan_env_value(&spec, "DISCORD_TOKEN").is_none(),
+            "Morgan sidecar must not receive Discord credentials"
+        );
+        assert!(
+            morgan_env_value(&spec, "PRESENCE_SHARED_TOKEN").is_none(),
+            "Morgan sidecar must not receive presence credentials"
+        );
+    }
+
+    #[test]
+    fn morgan_sidecar_added_for_implementation_agent_identity() {
+        let mut code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, false);
+        code_run.spec.harness_agent = Some(HarnessAgent::Hermes);
+        code_run.spec.implementation_agent = Some("morgan".to_string());
+
+        let spec = build_morgan_sidecar_spec(
+            &code_run,
+            &MorganSidecarConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            "runs/sidecar-test-run-uid",
+        )
+        .expect("Morgan sidecar should render for implementation_agent=morgan");
+
+        assert_eq!(spec["name"], "morgan-agent-sidecar");
+        assert_eq!(spec["image"], "ghcr.io/5dlabs/morgan-agent-sidecar:latest");
+        assert_eq!(spec["imagePullPolicy"], "Always");
     }
 
     /// Verify sidecar is added for ALL agent types (implementation agents)

@@ -49,6 +49,10 @@ pub struct ControllerConfig {
     #[serde(default)]
     pub presence: PresenceConfig,
 
+    /// Morgan meeting/avatar sidecar configuration for Hermes CodeRuns.
+    #[serde(default, rename = "morganSidecar")]
+    pub morgan_sidecar: MorganSidecarConfig,
+
     /// Tools sidecar configuration (per-pod tools-server on localhost)
     #[serde(default)]
     pub tools_sidecar: ToolsSidecarConfig,
@@ -121,6 +125,63 @@ impl Default for PresenceConfig {
             router_url: default_presence_router_url(),
             shared_token_secret_name: Some("openclaw-discord-tokens".to_string()),
             shared_token_secret_key: Some("PRESENCE_SHARED_TOKEN".to_string()),
+        }
+    }
+}
+
+/// Morgan meeting/avatar sidecar configuration.
+///
+/// This is intentionally opt-in and currently only renders for Hermes CodeRuns
+/// whose agent identity resolves to Morgan. The sidecar owns no Discord token;
+/// it shares the CodeRun workspace and exposes local health/tool endpoints plus
+/// JSONL/status streams for the agent harness.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MorganSidecarConfig {
+    /// Enable Morgan sidecar rendering for supported Hermes CodeRuns.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Morgan sidecar image.
+    #[serde(rename = "image")]
+    pub image: Option<String>,
+
+    /// Provider mode passed to the sidecar (`stub` until meeting providers are wired).
+    #[serde(default = "default_morgan_provider_mode", rename = "providerMode")]
+    pub provider_mode: String,
+
+    /// Informational MCP port exported to the sidecar.
+    #[serde(default = "default_morgan_mcp_port", rename = "mcpPort")]
+    pub mcp_port: u16,
+
+    /// HTTP health/tool port exposed by the current sidecar package.
+    #[serde(default = "default_morgan_health_port", rename = "healthPort")]
+    pub health_port: u16,
+}
+
+fn default_morgan_sidecar_image() -> String {
+    "ghcr.io/5dlabs/morgan-agent-sidecar:latest".to_string()
+}
+
+fn default_morgan_provider_mode() -> String {
+    "stub".to_string()
+}
+
+fn default_morgan_mcp_port() -> u16 {
+    4000
+}
+
+fn default_morgan_health_port() -> u16 {
+    4001
+}
+
+impl Default for MorganSidecarConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            image: Some(default_morgan_sidecar_image()),
+            provider_mode: default_morgan_provider_mode(),
+            mcp_port: default_morgan_mcp_port(),
+            health_port: default_morgan_health_port(),
         }
     }
 }
@@ -797,6 +858,7 @@ impl Default for ControllerConfig {
             },
             linear: LinearConfig::default(),
             presence: PresenceConfig::default(),
+            morgan_sidecar: MorganSidecarConfig::default(),
             tools_sidecar: ToolsSidecarConfig::default(),
         }
     }

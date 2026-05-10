@@ -10,6 +10,20 @@ export type {
   CreateEnvelopeOptions,
   MessagePriority,
 } from "./types.js";
+export {
+  InMemoryCoordinationPlane,
+  type DeadLetterMessage,
+  type DeliveryResult,
+  type FailDeliveryOptions,
+  type InMemoryCoordinationPlaneOptions,
+  type InboxMessage,
+  type ReadInboxOptions,
+  type RegisteredAgent,
+  type RegisterAgentOptions,
+  type RegisterGroupOptions,
+  type SendEnvelopeOptions,
+  type SendMessageOptions,
+} from "./store.js";
 
 import type { AgentAddress, AgentEnvelope, AgentMessage, CreateEnvelopeOptions } from "./types.js";
 
