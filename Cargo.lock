@@ -4,12 +4,12 @@ version = 4
 
 [[package]]
 name = "acp-runtime"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
  "async-trait",
- "config 0.2.74",
+ "config 0.2.88",
  "futures",
  "serde",
  "serde_json",
@@ -813,7 +813,7 @@ checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
 name = "cli"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -822,7 +822,7 @@ dependencies = [
  "futures",
  "handlebars",
  "k8s-openapi",
- "opentelemetry 0.31.0",
+ "opentelemetry",
  "regex",
  "schemars 0.8.22",
  "serde",
@@ -883,7 +883,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "serde",
  "serde_json",
@@ -966,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "acp-runtime",
  "anyhow",
@@ -974,7 +974,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
- "config 0.2.74",
+ "config 0.2.88",
  "dashmap 5.5.3",
  "flate2",
  "futures",
@@ -985,9 +985,9 @@ dependencies = [
  "mockall",
  "notify",
  "octocrab",
- "opentelemetry 0.31.0",
+ "opentelemetry",
  "opentelemetry-otlp",
- "opentelemetry_sdk 0.31.0",
+ "opentelemetry_sdk",
  "pulldown-cmark",
  "regex",
  "reqwest 0.12.28",
@@ -1576,7 +1576,7 @@ dependencies = [
 
 [[package]]
 name = "dex-indexer"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "bs58",
@@ -2056,7 +2056,7 @@ dependencies = [
 
 [[package]]
 name = "experience"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2638,7 +2638,7 @@ dependencies = [
 
 [[package]]
 name = "gpu"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2848,7 +2848,7 @@ dependencies = [
 
 [[package]]
 name = "healer"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "acp-runtime",
  "agent-client-protocol",
@@ -2858,7 +2858,7 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
- "config 0.2.74",
+ "config 0.2.88",
  "handlebars",
  "notify",
  "regex",
@@ -3394,7 +3394,7 @@ dependencies = [
 
 [[package]]
 name = "intake"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3404,7 +3404,7 @@ dependencies = [
  "cli",
  "colored",
  "comfy-table",
- "config 0.2.74",
+ "config 0.2.88",
  "dialoguer",
  "futures",
  "handlebars",
@@ -3908,7 +3908,7 @@ dependencies = [
 
 [[package]]
 name = "linear-sink"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4054,7 +4054,7 @@ dependencies = [
 
 [[package]]
 name = "metal"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4253,7 +4253,7 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4630,20 +4630,6 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaf416e4cb72756655126f7dd7bb0af49c674f4c1b9903e80c009e0c37e552e6"
-dependencies = [
- "futures-core",
- "futures-sink",
- "js-sys",
- "pin-project-lite",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
-name = "opentelemetry"
 version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b84bcd6ae87133e903af7ef497404dda70c60d0ea14895fc8a5e6722754fc2a0"
@@ -4665,7 +4651,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "http 1.4.0",
- "opentelemetry 0.31.0",
+ "opentelemetry",
  "reqwest 0.12.28",
 ]
 
@@ -4676,10 +4662,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2366db2dca4d2ad033cad11e6ee42844fd727007af5ad04a1730f4cb8163bf"
 dependencies = [
  "http 1.4.0",
- "opentelemetry 0.31.0",
+ "opentelemetry",
  "opentelemetry-http",
  "opentelemetry-proto",
- "opentelemetry_sdk 0.31.0",
+ "opentelemetry_sdk",
  "prost",
  "reqwest 0.12.28",
  "thiserror 2.0.18",
@@ -4693,26 +4679,11 @@ version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7175df06de5eaee9909d4805a3d07e28bb752c34cab57fa9cff549da596b30f"
 dependencies = [
- "opentelemetry 0.31.0",
- "opentelemetry_sdk 0.31.0",
+ "opentelemetry",
+ "opentelemetry_sdk",
  "prost",
  "tonic",
  "tonic-prost",
-]
-
-[[package]]
-name = "opentelemetry_sdk"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11f644aa9e5e31d11896e024305d7e3c98a88884d9f8919dbf37a9991bc47a4b"
-dependencies = [
- "futures-channel",
- "futures-executor",
- "futures-util",
- "opentelemetry 0.30.0",
- "percent-encoding",
- "rand 0.9.2",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -4724,7 +4695,7 @@ dependencies = [
  "futures-channel",
  "futures-executor",
  "futures-util",
- "opentelemetry 0.31.0",
+ "opentelemetry",
  "percent-encoding",
  "rand 0.9.2",
  "thiserror 2.0.18",
@@ -5174,7 +5145,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "play-launcher"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "clap",
@@ -5199,7 +5170,7 @@ dependencies = [
 
 [[package]]
 name = "pm"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "acp-runtime",
  "anyhow",
@@ -5208,7 +5179,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
- "config 0.2.74",
+ "config 0.2.88",
  "hex",
  "hmac",
  "k8s-openapi",
@@ -5503,7 +5474,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "itertools",
  "log",
  "multimap",
@@ -6113,7 +6084,7 @@ dependencies = [
 
 [[package]]
 name = "research"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anthropic",
  "anyhow",
@@ -6472,7 +6443,7 @@ dependencies = [
 
 [[package]]
 name = "scm"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7007,7 +6978,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.114",
@@ -7817,7 +7788,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -8306,7 +8277,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "axum",
@@ -8450,14 +8421,12 @@ dependencies = [
 
 [[package]]
 name = "tracing-opentelemetry"
-version = "0.31.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddcf5959f39507d0d04d6413119c04f33b623f4f951ebcbdddddfad2d0623a9c"
+checksum = "1ac28f2d093c6c477eaa76b23525478f38de514fa9aeb1285738d4b97a9552fc"
 dependencies = [
  "js-sys",
- "once_cell",
- "opentelemetry 0.30.0",
- "opentelemetry_sdk 0.30.0",
+ "opentelemetry",
  "smallvec",
  "tracing",
  "tracing-core",
@@ -8769,7 +8738,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.2.74"
+version = "0.2.88"
 dependencies = [
  "anyhow",
  "clap",
