@@ -270,7 +270,7 @@ spec:
               args:
                 - bash
                 - -lc
-                - exec acpx --format text --model gpt-5.5 --timeout 300 copilot exec --file -
+                - exec acpx --format quiet --model gpt-5.5 --timeout 300 copilot exec --file -
               input: "stdin"
               output: "text"
               serialize: true
