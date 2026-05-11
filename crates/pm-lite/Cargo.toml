@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # Tauri IPC - using same version as cto-app-tauri
-tauri = { version = "2.10" }
+tauri = { version = "2.11" }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
