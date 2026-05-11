@@ -41,7 +41,7 @@ jobs:
       minor: ${{ steps.release.outputs.minor }}
       patch: ${{ steps.release.outputs.patch }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           # Use manifest mode for monorepo support
