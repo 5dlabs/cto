@@ -831,6 +831,16 @@ spec:
     server: https://kubernetes.default.svc
     namespace: cto
 
+  # The upstream chart renders an empty StatefulSet volumeClaimTemplates list.
+  # Kubernetes normalizes that field on live objects, which otherwise leaves Argo
+  # reporting a phantom StatefulSet drift after successful server-side apply.
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      name: openclaw-swarm
+      namespace: cto
+      jqPathExpressions:
+        - .spec.volumeClaimTemplates[]?
   syncPolicy:
     automated:
       prune: true
@@ -839,6 +849,7 @@ spec:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
