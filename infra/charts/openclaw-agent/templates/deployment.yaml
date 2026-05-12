@@ -772,6 +772,10 @@ spec:
           env:
             - name: HOME
               value: /workspace
+            # Keep Kubernetes access stable even when CLI backends or harnesses
+            # override HOME for their own state directories.
+            - name: KUBECONFIG
+              value: /workspace/.kube/config
             - name: TZ
               value: "UTC"
             - name: OPENCLAW_CONFIG
