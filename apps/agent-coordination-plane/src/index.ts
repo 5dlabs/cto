@@ -24,6 +24,12 @@ export {
   type SendEnvelopeOptions,
   type SendMessageOptions,
 } from "./store.js";
+export {
+  CoordinationHttpService,
+  createCoordinationHttpServer,
+  startCoordinationHttpServer,
+  type CoordinationHttpServiceOptions,
+} from "./http.js";
 
 import type { AgentAddress, AgentEnvelope, AgentMessage, CreateEnvelopeOptions } from "./types.js";
 
