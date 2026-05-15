@@ -3,6 +3,98 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.89](https://github.com/5dlabs/cto/compare/v0.2.88...v0.2.89) (2026-05-15)
+
+
+### ✨ Features
+
+* add coordination plane http service ([afc1ea6](https://github.com/5dlabs/cto/commit/afc1ea62d856273f6b9adc45c42e225b337861a0))
+* add runtime-neutral Discord presence control plane ([85ee0d5](https://github.com/5dlabs/cto/commit/85ee0d503f8c5a88f525b5310b55c0550a16bdfa))
+* add three coder-class discord agents ([9547c06](https://github.com/5dlabs/cto/commit/9547c06c76e9ebe3ab857d53c0f0fed6238e7363))
+* advance control plane fleet wave ([e54d632](https://github.com/5dlabs/cto/commit/e54d632bde9c64807fb5a4854f65ba35dccaea4c))
+* **control-plane:** add Morgan sidecar stub package ([040d702](https://github.com/5dlabs/cto/commit/040d70229360add06717eabfe18c4280eb43b2d6))
+* **control-plane:** add Morgan sidecar stub package ([c3f8d83](https://github.com/5dlabs/cto/commit/c3f8d83aeb75cd4aa252822479c914c18a579bd2))
+* **hermes:** add Coder voice slash command ([#4923](https://github.com/5dlabs/cto/issues/4923)) ([a3a40b0](https://github.com/5dlabs/cto/commit/a3a40b03022a6b77ae93b5abaaa0889dc0be11d2))
+* **hermes:** authorize edge_kase Discord user ([#4906](https://github.com/5dlabs/cto/issues/4906)) ([44ce410](https://github.com/5dlabs/cto/commit/44ce410b69915e924501b5ed96f16b7291bfc62d))
+* **hermes:** enable ElevenLabs TTS for Coder voice ([#4922](https://github.com/5dlabs/cto/issues/4922)) ([6ba5a82](https://github.com/5dlabs/cto/commit/6ba5a826bb7fb3fafb5b64e9dfd01322286f305d))
+* **hermes:** minimal upstream gateway chart ([#4904](https://github.com/5dlabs/cto/issues/4904)) ([00a2477](https://github.com/5dlabs/cto/commit/00a24779f58e5d3c83568da5a19a6735654abc4b))
+* **intake:** deliberation video (ffmpeg slideshow + ElevenLabs TTS) ([#4898](https://github.com/5dlabs/cto/issues/4898)) ([b481975](https://github.com/5dlabs/cto/commit/b481975d2e4f4dcad1c8c7d168a58066ccbe8891))
+* **intake:** make LLM invocation harness agnostic ([#4912](https://github.com/5dlabs/cto/issues/4912)) ([6757428](https://github.com/5dlabs/cto/commit/67574283aa83c2830dc4b46d6c9b3c25bc9af4f3))
+* **intake:** make LLM invocation harness agnostic ([#4915](https://github.com/5dlabs/cto/issues/4915)) ([fe655d1](https://github.com/5dlabs/cto/commit/fe655d1d170732dbf76c3cc371b75683fcc58791))
+* **intake:** standardize LLM calls on ACPX backend ([6273468](https://github.com/5dlabs/cto/commit/6273468e88f2628ad2c462f159b3c0b123458e9e))
+
+
+### 🐛 Bug Fixes
+
+* add coder clone autonomy watchdog ([2ea5029](https://github.com/5dlabs/cto/commit/2ea5029b43940e078f2e34b687ecf9919daa5881))
+* add Hermes GitHub workspace credentials ([75a757f](https://github.com/5dlabs/cto/commit/75a757f71f99d9c4f04beb5a72bdab5b25b74463))
+* add kubectl to Hermes runtime ([557ca5f](https://github.com/5dlabs/cto/commit/557ca5f87037a2d38ca4f10d2c47ccc2f6e4c67e))
+* align coder context and setup provider titles ([770ea99](https://github.com/5dlabs/cto/commit/770ea99d02616750ada323d93cc41ceaef2e8b0f))
+* align coder-class agents with generalist context ([7be6bd5](https://github.com/5dlabs/cto/commit/7be6bd5b2afd87fafd83b0f9085b0bd2e3844cfe))
+* allow empty bclaws gateway render ([cef9dcd](https://github.com/5dlabs/cto/commit/cef9dcd3316ee22fe8df6573e641e59bca33e498))
+* authenticate gh in Hermes terminal ([10f1987](https://github.com/5dlabs/cto/commit/10f1987fb22b69cb41009ec1ee1553fdd0596849))
+* **coder:** disable mem0Plugin and tokenjuice to unblock gateway startup ([#4902](https://github.com/5dlabs/cto/issues/4902)) ([e8710a1](https://github.com/5dlabs/cto/commit/e8710a1b458025961a3f95dfe0e68a1f3c146321))
+* disable duplicate Coder Discord gateway ([6f5292b](https://github.com/5dlabs/cto/commit/6f5292bd12bf13dac50eeeb3310ccc19968bdb06))
+* enable Hermes autonomous mode ([83948e7](https://github.com/5dlabs/cto/commit/83948e7086afa4c5fb7d026dc4a488324514368a))
+* enable Hermes coder Discord gateway ([3cd5e69](https://github.com/5dlabs/cto/commit/3cd5e6929bd160aeb8732fb8f4b9aa833f0f942f))
+* export kubeconfig for agent runtimes ([#4942](https://github.com/5dlabs/cto/issues/4942)) ([4a8fc2d](https://github.com/5dlabs/cto/commit/4a8fc2db3e6382c10051cf0a415552776ebf22c8))
+* extend avatar coder copilot timeout ([e531fe0](https://github.com/5dlabs/cto/commit/e531fe030cd76d5c3f012f922447e59608d94ac3))
+* extend coder-class copilot timeout ([77c075f](https://github.com/5dlabs/cto/commit/77c075f31173bf4afb7e426b69641c2c085796b4))
+* **hermes:** sync Coder voice command to CTO guild ([6f22618](https://github.com/5dlabs/cto/commit/6f2261852a49eeb5eab0ca69cdef867294ef2bae))
+* ignore openclaw swarm statefulset drift ([261c075](https://github.com/5dlabs/cto/commit/261c07599b299e7ebeef8e33c486878c94e9c965))
+* include Discord plugin when channel is enabled ([e2195a3](https://github.com/5dlabs/cto/commit/e2195a308aaa52d13e6df1a953dda7ab8c85383d))
+* install Hermes coder Discord plugin ([000d8b9](https://github.com/5dlabs/cto/commit/000d8b9dfeae674a4a47201fde10e4e7a099ac84))
+* **intake:** enforce provider routing and Sigma artifact generation ([72d32f5](https://github.com/5dlabs/cto/commit/72d32f512be09a62b3bc4c693f0c5168652b66db))
+* **intake:** persist Copilot ACP routing via GitOps ([#4921](https://github.com/5dlabs/cto/issues/4921)) ([fec28eb](https://github.com/5dlabs/cto/commit/fec28eb53e0416b698d80e010a05e326df57d444))
+* **intake:** resolve ACP adapter path independent of WORKSPACE ([88c678f](https://github.com/5dlabs/cto/commit/88c678f2a5583da97efd6f138e03d61382ec5579))
+* keep git credentials active during agent repo bootstrap ([24c24a4](https://github.com/5dlabs/cto/commit/24c24a425ff10fc3d96747e6879ac0f9b57c39bd))
+* keep legacy Coder off Discord ([4bac928](https://github.com/5dlabs/cto/commit/4bac928fbeb9872536cb7b698876797b390caba7))
+* make hermes coder schedulable ([279a17e](https://github.com/5dlabs/cto/commit/279a17e4ac42be4212100140d188e2835edb0dc0))
+* **networking:** stabilize avatar demo tunnel target ([#4895](https://github.com/5dlabs/cto/issues/4895)) ([547e665](https://github.com/5dlabs/cto/commit/547e665a95745df3fc2d5e9037dce64e9268cb3f))
+* **openclaw-agent:** bound `openclaw doctor` with 30s timeout in init ([#4903](https://github.com/5dlabs/cto/issues/4903)) ([b1719be](https://github.com/5dlabs/cto/commit/b1719bed62f553b7a32084690400a6c7a537568b))
+* quiet acpx copilot output in agents ([#4944](https://github.com/5dlabs/cto/issues/4944)) ([92856c6](https://github.com/5dlabs/cto/commit/92856c6ce2224446e821656b86ee7403c5b9b52b))
+* remove stale codex plugin from Hermes coder gateway ([fe3ec30](https://github.com/5dlabs/cto/commit/fe3ec30c37cc7f519417a7ca0ffae47b89f7db49))
+* retarget coder bots off metal and morgan tokens ([c5dcad5](https://github.com/5dlabs/cto/commit/c5dcad5a445feab1fd40632ec68b2f53e347088d))
+* retarget coder bots off metal and morgan tokens ([e319886](https://github.com/5dlabs/cto/commit/e3198866690b5d654598119883a295ca5475e923))
+* route Colosseum through ACPX Copilot ([#4941](https://github.com/5dlabs/cto/issues/4941)) ([62c2bf2](https://github.com/5dlabs/cto/commit/62c2bf24ff5c95c661ec38e3b4f99666601a8ced))
+* route hermes coder through acpx copilot ([6ba6720](https://github.com/5dlabs/cto/commit/6ba67205e8b5e501cc8bd8cc305940de752a13bb))
+* route hermes coder through copilot gpt-5.5 ([9766e2a](https://github.com/5dlabs/cto/commit/9766e2ae78f89d30df71afab80644941fb450c9e))
+* run Hermes coder gateway as main process ([d91e65e](https://github.com/5dlabs/cto/commit/d91e65ebd88633fee03542b1f1f4b2578a5014e8))
+* use GPT-5.5 Copilot token for Hermes ([2bdf100](https://github.com/5dlabs/cto/commit/2bdf10031d449a93e4995834698ff57324dbe538))
+
+
+### 📚 Documentation
+
+* **control-plane:** decide Morgan sidecar source ([f07d0e7](https://github.com/5dlabs/cto/commit/f07d0e78833e8e5e1939d7215ac3cca56e7c413f))
+* **control-plane:** decide Morgan sidecar source ([13c58b3](https://github.com/5dlabs/cto/commit/13c58b31c0fae202c6b4fc7397aceb083e062f97))
+* **control-plane:** record builder PR merge authority ([4a08272](https://github.com/5dlabs/cto/commit/4a08272fe030a499c05b250d87f1f145942d522f))
+* **control-plane:** record live Hermes smoke evidence ([d2843c8](https://github.com/5dlabs/cto/commit/d2843c81eae2b9cf99ad6d9c87d6823e009a7948))
+* **control-plane:** record live Hermes smoke evidence ([926bc23](https://github.com/5dlabs/cto/commit/926bc234ba6596bf6fefc12475019dcf455885bd))
+* **control-plane:** record Morgan sidecar image evidence ([e4d3b97](https://github.com/5dlabs/cto/commit/e4d3b97d43fba54e6e3e8070d11a27223fb884df))
+* **control-plane:** record Morgan sidecar image publish evidence ([394bbd1](https://github.com/5dlabs/cto/commit/394bbd13942318602c2f4dc7ecd93a0d11917ad3))
+* **control-plane:** record Morgan task routing smoke ([e1806cf](https://github.com/5dlabs/cto/commit/e1806cfe71c5e07bd42b8569fd949105b5e593c3))
+* **control-plane:** record Morgan task routing smoke ([eccbdd2](https://github.com/5dlabs/cto/commit/eccbdd27af7126b730110ed1a9797673b437025b))
+* **control-plane:** refresh live Hermes smoke evidence ([8e4ed04](https://github.com/5dlabs/cto/commit/8e4ed0448c0ee58788ee1bffcfbbaefb4f0d796e))
+* **control-plane:** refresh live Hermes smoke evidence ([#4929](https://github.com/5dlabs/cto/issues/4929)) ([0b8319b](https://github.com/5dlabs/cto/commit/0b8319b926fad82cf0cb9ca4a2d25dbe4c974d48))
+* **control-plane:** refresh live Hermes smoke evidence ([#4930](https://github.com/5dlabs/cto/issues/4930)) ([6a90cea](https://github.com/5dlabs/cto/commit/6a90ceaf95649256e47d01d8231564be6437a783))
+* hand off OAuth model routing reserves ([#4917](https://github.com/5dlabs/cto/issues/4917)) ([aff04bb](https://github.com/5dlabs/cto/commit/aff04bb149e8ba99f120da5aa542f1e924f9fb84))
+* hand off OVH VM deployment work ([#4950](https://github.com/5dlabs/cto/issues/4950)) ([27de319](https://github.com/5dlabs/cto/commit/27de319363428ea69c034b9764ef2b0ce4f1a90f))
+* **intake:** Hermes sigma-1 handoff + gpt-5.5 pin ([#4901](https://github.com/5dlabs/cto/issues/4901)) ([a7f2817](https://github.com/5dlabs/cto/commit/a7f2817fc01d13101c6d45b4f22bc17c919408c2))
+
+
+### 🔧 Maintenance
+
+* **coder:** scale openclaw-coder STS to 0 to free Discord coder token ([#4905](https://github.com/5dlabs/cto/issues/4905)) ([969ea9c](https://github.com/5dlabs/cto/commit/969ea9cd8a31c4dab89a9703d8af3cd852b8e39a))
+* **intake:** emit sigma-1-style .plan/ layout alongside .tasks/ ([#4897](https://github.com/5dlabs/cto/issues/4897)) ([a8031d3](https://github.com/5dlabs/cto/commit/a8031d35dca28729e4b04a98377c2d8d5180e2cb))
+* pause bclaws hermes gateway ([64e474f](https://github.com/5dlabs/cto/commit/64e474f8de3a65fd6afe86e10e3b946e4306a401))
+* upgrade control-plane Hermes agent image ([51e6de9](https://github.com/5dlabs/cto/commit/51e6de96056ebfd5e7dcb0e78503f3b5f8750464))
+
+
+### 👷 CI/CD
+
+* **control-plane:** add Morgan sidecar image workflow ([7c34a08](https://github.com/5dlabs/cto/commit/7c34a0820a337381ed1e808bcb1dc952850c31ee))
+* **control-plane:** publish Morgan agent sidecar image ([f32ccb3](https://github.com/5dlabs/cto/commit/f32ccb31045e203f7a5a888095aff5f5e2e0bfcf))
+
 ## [0.2.88](https://github.com/5dlabs/cto/compare/v0.2.87...v0.2.88) (2026-04-27)
 
 
