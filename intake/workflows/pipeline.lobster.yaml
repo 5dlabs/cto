@@ -194,8 +194,10 @@ steps:
       mkdir -p "$WS/.intake/audio" "$WS/.tasks/audio"
       rm -f \
         "$WS/.intake/audio/architecture-deliberation.status.json" \
+        "$WS/.intake/audio/architecture-deliberation.validation.json" \
         "$WS/.intake/audio/architecture-deliberation.log" \
         "$WS/.intake/audio/design-deliberation.status.json" \
+        "$WS/.intake/audio/design-deliberation.validation.json" \
         "$WS/.intake/audio/design-deliberation.log" \
         "$WS/.tasks/audio/architecture-deliberation.mp3" \
         "$WS/.tasks/audio/architecture-deliberation.transcript.json" \
@@ -1466,12 +1468,17 @@ steps:
         jq -nc --arg path "$TRANSCRIPT_PATH" '{skipped: true, reason: "missing transcript", transcript: $path}'
         exit 0
       fi
-      if [ ! -s "$AUDIO_PATH" ] || ! jq -e '.status == "valid"' "$AUDIO_VALIDATION_PATH" >/dev/null 2>&1; then
-        echo "generate-deliberation-video: skipped — design MP3 has not been validated" >&2
+      TRANSCRIPT_SHA256="$(sha256sum "$TRANSCRIPT_PATH" | awk '{print $1}')"
+      if [ ! -s "$AUDIO_PATH" ] \
+        || ! jq -e --arg transcript_hash "$TRANSCRIPT_SHA256" \
+          '.status == "valid" and .transcriptHash == $transcript_hash' \
+          "$AUDIO_VALIDATION_PATH" >/dev/null 2>&1; then
+        echo "generate-deliberation-video: skipped — design MP3 has not been validated for this transcript" >&2
         jq -nc \
           --arg mp3 "$AUDIO_PATH" \
           --arg validation "$AUDIO_VALIDATION_PATH" \
-          '{skipped: true, reason: "audio_not_validated", mp3: $mp3, validation: $validation}'
+          --arg transcriptHash "$TRANSCRIPT_SHA256" \
+          '{skipped: true, reason: "audio_not_validated", mp3: $mp3, validation: $validation, transcriptHash: $transcriptHash}'
         exit 0
       fi
 

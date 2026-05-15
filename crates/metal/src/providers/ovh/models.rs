@@ -235,7 +235,7 @@ pub struct CreateSshKeyRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCartRequest {
-    /// OVH subsidiary (e.g., "US", "EU", "FR").
+    /// OVH account subsidiary/login region (e.g., "CA", "US", "EU").
     pub ovh_subsidiary: String,
     /// Optional description.
     #[serde(skip_serializing_if = "Option::is_none")]

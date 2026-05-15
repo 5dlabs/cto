@@ -348,6 +348,30 @@ codeServer:
     enabled: true
 
 # =============================================================================
+# Optional browser-based remote desktop sidecar
+# =============================================================================
+# KasmVNC provides a browser-native desktop over HTTPS/WebSockets, which works on
+# constrained browsers where native RDP/VNC clients are unavailable.
+remoteDesktop:
+  enabled: false
+  image:
+    repository: kasmweb/chrome
+    tag: "1.16.0"
+    pullPolicy: IfNotPresent
+  port: 6901
+  servicePort: 6901
+  passwordSecret:
+    name: ""
+    key: remote-desktop-password
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+# =============================================================================
 # Optional extra dev-server port on the agent Service
 # =============================================================================
 # Exposes an arbitrary TCP port on the agent's ClusterIP service so workloads
@@ -569,6 +593,10 @@ claudeCode:
         args: ["-y", "firecrawl-mcp"]
         env:
           FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
+      # Scenario — hosted MCP for image, video, 3D, audio, asset, and workflow generation
+      scenario:
+        command: "npx"
+        args: ["-y", "mcp-remote@latest", "https://mcp.scenario.com/mcp"]
 
 # =============================================================================
 # Codex CLI plugin (OAuth auth.json passthrough)
@@ -606,6 +634,34 @@ toolsConfig:
         - "read_graph"
         - "search_nodes"
         - "open_nodes"
+    scenario:
+      command: "npx"
+      args:
+        - "-y"
+        - "mcp-remote@latest"
+        - "https://mcp.scenario.com/mcp"
+      tools:
+        - "list_teams"
+        - "list_projects"
+        - "search"
+        - "recommend"
+        - "recommend_training"
+        - "plan_generation"
+        - "get_model_schema"
+        - "run_model"
+        - "train"
+        - "manage_workflows"
+        - "manage_jobs"
+        - "display_asset"
+        - "analyze"
+        - "upload_asset"
+        - "complete_upload"
+        - "manage_assets"
+        - "manage_models"
+        - "manage_collections"
+        - "usage"
+        - "capture_3d_view"
+        - "proxy_asset_fetch"
 
 toolServer:
   url: ""

@@ -33,6 +33,16 @@ modelDefaults:
   fallbacks:
     - "acpx-copilot/gpt-5.5"
 
+# Give the persistent Coder pod enough headroom for large local builds and
+# multi-tool workflows. The chart intentionally avoids CPU limits so agents
+# can burst when node capacity is available.
+resources:
+  requests:
+    cpu: "8"
+    memory: "64Gi"
+  limits:
+    memory: "64Gi"
+
 cliBackends:
   acpx-copilot:
     command: "/usr/bin/env"
@@ -56,6 +66,16 @@ image:
   repository: ghcr.io/5dlabs/agents
   tag: "latest"
   pullPolicy: Always
+
+remoteDesktop:
+  enabled: true
+  image:
+    repository: kasmweb/chrome
+    tag: "1.16.0"
+    pullPolicy: IfNotPresent
+  passwordSecret:
+    name: cto-coder-api-keys
+    key: remote-desktop-password
 
 # Keep cross-pod NATS messaging disabled; this bot is not part of the
 # multi-agent mesh.

@@ -677,6 +677,10 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+            {{- if .Values.remoteDesktop.enabled }}
+            - name: remote-desktop-shm
+              mountPath: /dev/shm
+            {{- end }}
             - name: config-template
               mountPath: /config-template
             {{- if .Values.claudeCode.enabled }}
@@ -951,6 +955,25 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: firecrawl-api-key
                   optional: true
+            # Scenario.com API keys for headless creative generation workflows.
+            - name: SCENARIO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: SCENARIO_API_KEY
+                  optional: true
+            - name: SCENARIO_SECRET_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: SCENARIO_SECRET_API_KEY
+                  optional: true
+            - name: SCENARIO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: SCENARIO_SECRET_API_KEY
+                  optional: true
             {{- if .Values.claudeCode.enabled }}
             # Claude Code CLI settings path (settings.json with permissions + teams)
             - name: CLAUDE_CONFIG_DIR
@@ -1054,6 +1077,12 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: ovh-consumer-key
+                  optional: true
+            - name: OVH_SUBSIDIARY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-subsidiary
                   optional: true
             - name: OVH_ENDPOINT
               valueFrom:
@@ -1483,6 +1512,40 @@ spec:
               memory: 256Mi
         {{- end }}
         {{- end }}
+        {{- if .Values.remoteDesktop.enabled }}
+        - name: remote-desktop
+          image: "{{ .Values.remoteDesktop.image.repository }}:{{ .Values.remoteDesktop.image.tag }}"
+          imagePullPolicy: {{ .Values.remoteDesktop.image.pullPolicy }}
+          env:
+            - name: VNC_PW
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "remoteDesktop.passwordSecret.name is required when remoteDesktop.enabled=true" .Values.remoteDesktop.passwordSecret.name }}
+                  key: {{ .Values.remoteDesktop.passwordSecret.key | default "remote-desktop-password" }}
+            - name: LAUNCH_URL
+              value: {{ .Values.codeServer.publicUrl | default "about:blank" | quote }}
+          ports:
+            - name: remote-desktop
+              containerPort: {{ .Values.remoteDesktop.port | default 6901 }}
+              protocol: TCP
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: remote-desktop-shm
+              mountPath: /dev/shm
+          readinessProbe:
+            tcpSocket:
+              port: remote-desktop
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: remote-desktop
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.remoteDesktop.resources | nindent 12 }}
+        {{- end }}
         {{- if .Values.projectApi.enabled }}
         # ---------------------------------------------------------------
         # project-api sidecar — HTTP surface for /workspace/repos and the
@@ -1721,6 +1784,12 @@ spec:
         {{- if .Values.tools.acp.enabled }}
         - name: acpx-node-modules
           emptyDir: {}
+        {{- end }}
+        {{- if .Values.remoteDesktop.enabled }}
+        - name: remote-desktop-shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
         {{- end }}
         {{- if .Values.kaniko.enabled }}
         - name: kaniko-docker-config
