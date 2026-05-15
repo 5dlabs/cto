@@ -39,9 +39,9 @@ modelDefaults:
 resources:
   requests:
     cpu: "8"
-    memory: "64Gi"
+    memory: "48Gi"
   limits:
-    memory: "64Gi"
+    memory: "56Gi"
 
 cliBackends:
   acpx-copilot:
