@@ -38,7 +38,7 @@ pub struct Ovh {
     application_secret: String,
     /// Consumer key (for authenticated requests).
     consumer_key: String,
-    /// OVH subsidiary (US, EU, etc).
+    /// OVH account subsidiary/login region (US, EU, CA, etc).
     subsidiary: String,
 }
 
@@ -66,7 +66,7 @@ impl Ovh {
     /// * `application_key` - OVH Application Key
     /// * `application_secret` - OVH Application Secret
     /// * `consumer_key` - OVH Consumer Key
-    /// * `subsidiary` - OVH subsidiary code (US, EU, FR, etc.)
+    /// * `subsidiary` - OVH account subsidiary/login code (US, EU, CA, etc.)
     ///
     /// # Errors
     /// Returns error if HTTP client cannot be created.
@@ -269,6 +269,13 @@ impl Ovh {
             created_at: None, // OVH doesn't provide creation date
         }
     }
+
+    fn region_config(req: &CreateServerRequest) -> ItemConfigurationRequest {
+        ItemConfigurationRequest {
+            label: "region".to_string(),
+            value: req.region.clone(),
+        }
+    }
 }
 
 #[async_trait]
@@ -372,11 +379,8 @@ impl Provider for Ovh {
             )
             .await?;
 
-        // Step 5c: Configure server - region
-        let region_config = ItemConfigurationRequest {
-            label: "region".to_string(),
-            value: self.subsidiary.to_lowercase(),
-        };
+        // Step 5c: Configure server - deployment region, independent of account subsidiary/login.
+        let region_config = Self::region_config(&req);
         let _: ConfigurationResponse = self
             .post(
                 &format!(
@@ -647,6 +651,23 @@ mod tests {
         assert!(json.is_ok());
         let json_str = json.unwrap();
         assert!(json_str.contains("dedicated_datacenter"));
+    }
+
+    #[test]
+    fn test_region_config_uses_requested_region_not_subsidiary() {
+        let req = CreateServerRequest {
+            hostname: "node-1".to_string(),
+            plan: "rise-1".to_string(),
+            region: "bhs".to_string(),
+            os: "none_64.en".to_string(),
+            ssh_keys: vec![],
+            ip_addresses: vec![],
+        };
+
+        let region_config = Ovh::region_config(&req);
+
+        assert_eq!(region_config.label, "region");
+        assert_eq!(region_config.value, "bhs");
     }
 
     #[test]

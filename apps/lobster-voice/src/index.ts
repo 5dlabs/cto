@@ -1,7 +1,7 @@
 import { appendFileSync, copyFileSync, mkdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from "fs";
 import { basename, dirname, join } from "path";
 import { tmpdir } from "os";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { execFileSync } from "child_process";
 
 import { getVoiceConfig, resolveLevel } from "./voices";
@@ -65,16 +65,20 @@ function resolveVoice(flags: Record<string, string>, level: VoiceLevel): VoiceCo
   return getVoiceConfig(level);
 }
 
-const PROVIDER_API_KEYS: Record<TtsProvider, string> = {
-  elevenlabs: "ELEVEN_API_KEY",
-  openai: "OPENAI_API_KEY",
-  xai: "XAI_API_KEY",
+const PROVIDER_API_KEYS: Record<TtsProvider, string[]> = {
+  elevenlabs: ["ELEVEN_API_KEY", "ELEVENLABS_API_KEY"],
+  openai: ["OPENAI_API_KEY"],
+  xai: ["XAI_API_KEY"],
 };
 
 const FALLBACK_ORDER: TtsProvider[] = ["elevenlabs", "openai", "xai"];
 
 function getApiKey(provider: TtsProvider): string | undefined {
-  return process.env[PROVIDER_API_KEYS[provider]];
+  for (const envName of PROVIDER_API_KEYS[provider]) {
+    const value = process.env[envName];
+    if (value && value.trim().length > 0) return value;
+  }
+  return undefined;
 }
 
 async function synthesizeWithProvider(text: string, voice: VoiceConfig, apiKey: string): Promise<Buffer> {
@@ -128,6 +132,10 @@ interface RenderStatus {
   status: RenderStatusState;
   startedAt?: string;
   finishedAt?: string;
+  inputPath?: string;
+  transcriptHash?: string;
+  transcriptSessionId?: string;
+  transcriptGeneratedAt?: string;
   outputPath?: string;
   segmentCount?: number;
   chunkCount?: number;
@@ -169,6 +177,10 @@ function logRender(logPath: string | undefined, message: string): void {
 function writeRenderStatus(statusPath: string | undefined, status: RenderStatus): void {
   if (!statusPath) return;
   writeJsonFile(statusPath, status);
+}
+
+function sha256File(filePath: string): string {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
 
 function probeAudioFile(filePath: string): AudioProbeResult {
@@ -482,7 +494,9 @@ async function cmdRenderTranscript(flags: Record<string, string>): Promise<void>
 
   const startedAt = nowIso();
   let transcript: TranscriptDocument;
+  let transcriptHash: string | undefined;
   try {
+    transcriptHash = sha256File(inputPath);
     transcript = readTranscriptDocument(inputPath);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
@@ -490,6 +504,8 @@ async function cmdRenderTranscript(flags: Record<string, string>): Promise<void>
       status: "failed",
       startedAt,
       finishedAt: nowIso(),
+      inputPath,
+      transcriptHash,
       outputPath,
       segmentCount: 0,
       chunkCount: 0,
@@ -503,6 +519,10 @@ async function cmdRenderTranscript(flags: Record<string, string>): Promise<void>
   writeRenderStatus(statusPath, {
     status: "running",
     startedAt,
+    inputPath,
+    transcriptHash,
+    transcriptSessionId: transcript.sessionId,
+    transcriptGeneratedAt: transcript.generatedAt,
     outputPath,
     segmentCount: segments.length,
     chunkCount: 0,
@@ -515,6 +535,10 @@ async function cmdRenderTranscript(flags: Record<string, string>): Promise<void>
       status: "failed",
       startedAt,
       finishedAt: nowIso(),
+      inputPath,
+      transcriptHash,
+      transcriptSessionId: transcript.sessionId,
+      transcriptGeneratedAt: transcript.generatedAt,
       outputPath,
       segmentCount: 0,
       chunkCount: 0,
@@ -571,6 +595,10 @@ async function cmdRenderTranscript(flags: Record<string, string>): Promise<void>
       status: "complete",
       startedAt,
       finishedAt: nowIso(),
+      inputPath,
+      transcriptHash,
+      transcriptSessionId: transcript.sessionId,
+      transcriptGeneratedAt: transcript.generatedAt,
       outputPath,
       segmentCount: segments.length,
       chunkCount,
@@ -587,6 +615,10 @@ async function cmdRenderTranscript(flags: Record<string, string>): Promise<void>
       status: "failed",
       startedAt,
       finishedAt: nowIso(),
+      inputPath,
+      transcriptHash,
+      transcriptSessionId: transcript.sessionId,
+      transcriptGeneratedAt: transcript.generatedAt,
       outputPath,
       segmentCount: segments.length,
       chunkCount,
@@ -671,7 +703,7 @@ Speakers:
   compiler    Brief compilation (Adam — ElevenLabs)
 
 Environment:
-  ELEVEN_API_KEY             ElevenLabs API key
+  ELEVEN_API_KEY             ElevenLabs API key (ELEVENLABS_API_KEY also supported)
   OPENAI_API_KEY             OpenAI API key (TTS + optional LLM rewriting)
   XAI_API_KEY                xAI API key (TTS with expressive tags)
   LOBSTER_VOICE_LLM=1        Enable LLM rewriting of messages

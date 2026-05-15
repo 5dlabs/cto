@@ -29,7 +29,7 @@ Prefixed with `$1$`. Credentials come from `ProviderConfig.ovh_app_key`, `ovh_ap
 
 ### Subsidiary
 
-OVH operates regional subsidiaries (US, EU, FR, CA, etc.). Set via `ProviderConfig.ovh_subsidiary` (defaults to "US").
+OVH operates regional subsidiaries/logins (US, EU, FR, CA, etc.). Set via `ProviderConfig.ovh_subsidiary` or `OVH_SUBSIDIARY` (defaults to "US"). This is the account/login subsidiary only; it does **not** constrain the availability region or datacenter used for deployment.
 
 ## Key Endpoints
 
@@ -59,7 +59,7 @@ OVH uses a cart-based ordering system:
 5. POST /order/cart/{id}/item/{id}/configuration  (x3):
    - label: "dedicated_datacenter", value: "<dc>"    (e.g., "gra1", "hil")
    - label: "dedicated_os", value: "none_64.en"      (no OS for Talos)
-   - label: "region", value: "<subsidiary>"
+   - label: "region", value: "<requested-region>"
 6. POST /order/cart/{id}/checkout             → Place order (auto-pay)
 7. Wait for server to appear in /dedicated/server
 ```
@@ -70,7 +70,7 @@ Server IDs in OVH look like `ns1234567.ip-1-2-3.eu`.
 
 - `dedicated_datacenter`: Datacenter code (e.g., `gra1`, `hil`, `bhs`, `rbx`)
 - `dedicated_os`: Use `none_64.en` for Talos (no OS installation)
-- `region`: Matches the subsidiary in lowercase
+- `region`: Requested availability region/datacenter; independent of the OVH account subsidiary/login
 - Duration: Usually `P1M` (monthly) or `P12M` (annual)
 - `pricingMode`: Usually `"default"`
 

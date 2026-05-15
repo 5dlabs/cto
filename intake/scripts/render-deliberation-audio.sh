@@ -23,6 +23,8 @@ VOICE_BIN="${LOBSTER_VOICE_BIN:-$ROOT/apps/lobster-voice/lobster-voice}"
 VALIDATE_AUDIO_BIN="${VALIDATE_DELIBERATION_AUDIO_BIN:-$ROOT/intake/scripts/validate-deliberation-audio.sh}"
 
 mkdir -p "$(dirname "$OUTPUT_MP3")" "$(dirname "$STATUS_JSON")" "$(dirname "$LOG_FILE")" "$(dirname "$VALIDATION_JSON")"
+: > "$LOG_FILE"
+rm -f "$OUTPUT_MP3" "$VALIDATION_JSON"
 
 if [ ! -f "$TRANSCRIPT" ]; then
   echo "render-deliberation-audio: transcript not found at $TRANSCRIPT" >&2
@@ -72,6 +74,7 @@ if "$VOICE_BIN" render-transcript \
 else
   END_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "render-deliberation-audio: $NAME render failed — see $LOG_FILE" >&2
+  rm -f "$OUTPUT_MP3" "$VALIDATION_JSON"
   jq -nc --arg name "$NAME" --arg start "$START_TS" --arg end "$END_TS" \
     '{name:$name,status:"failed",reason:"render_error",startedAt:$start,completedAt:$end}' \
     > "$STATUS_JSON"

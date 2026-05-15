@@ -73,16 +73,27 @@ fi
 
 CODEC="$(printf '%s' "$PROBE_JSON" | jq -r '.streams[0].codec_name // "unknown"')"
 FORMAT="$(printf '%s' "$PROBE_JSON" | jq -r '.format.format_name // "unknown"')"
+TRANSCRIPT_HASH="$(jq -r '.transcriptHash // empty' "$STATUS_JSON" 2>/dev/null || true)"
+TRANSCRIPT_PATH="$(jq -r '.inputPath // empty' "$STATUS_JSON" 2>/dev/null || true)"
+if [ -z "$TRANSCRIPT_HASH" ]; then
+  echo "validate-deliberation-audio: render status missing transcript hash" >&2
+  write_failed "transcript_hash_missing"
+  exit 1
+fi
+MP3_SHA256="$(sha256sum "$MP3_PATH" | awk '{print $1}')"
 
 jq -nc \
   --arg name "$NAME" \
   --arg mp3 "$MP3_PATH" \
   --arg statusPath "$STATUS_JSON" \
+  --arg transcriptPath "$TRANSCRIPT_PATH" \
+  --arg transcriptHash "$TRANSCRIPT_HASH" \
+  --arg mp3Sha256 "$MP3_SHA256" \
   --arg ts "$TS" \
   --arg codec "$CODEC" \
   --arg format "$FORMAT" \
   --argjson duration "$DURATION" \
-  '{name:$name,status:"valid",mp3Path:$mp3,statusPath:$statusPath,validatedAt:$ts,durationSeconds:$duration,codec:$codec,format:$format}' \
+  '{name:$name,status:"valid",mp3Path:$mp3,statusPath:$statusPath,transcriptPath:$transcriptPath,transcriptHash:$transcriptHash,mp3Sha256:$mp3Sha256,validatedAt:$ts,durationSeconds:$duration,codec:$codec,format:$format}' \
   > "$VALIDATION_JSON"
 
 echo "validate-deliberation-audio: $NAME valid (${DURATION}s, codec=$CODEC)" >&2

@@ -67,6 +67,27 @@ tunnelRef:
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:
+  name: hermes-coder-desktop
+  namespace: cto
+  annotations:
+    # Keep this hostname behind a Cloudflare Access self-hosted application.
+    # Kasm also requires the VNC_PW from cto-coder-api-keys[remote-desktop-password].
+    5dlabs.ai/cloudflare-access-required: "true"
+subjects:
+  - kind: Service
+    name: openclaw-hermes-coder
+    spec:
+      fqdn: desktop.5dlabs.ai
+      protocol: https
+      target: https://openclaw-hermes-coder.cto.svc:6901
+      noTlsVerify: true
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
   name: cto-web
   namespace: cto
 subjects:

@@ -63,6 +63,10 @@ struct Cli {
     #[arg(long, env = "OVH_CONSUMER_KEY", default_value = "")]
     ovh_consumer_key: String,
 
+    /// OVH account subsidiary/login region (e.g., CA, US, EU). This does not constrain deployment region.
+    #[arg(long, env = "OVH_SUBSIDIARY", default_value = "")]
+    ovh_subsidiary: String,
+
     // ── Vultr credentials ──────────────────────────────────────────────
     /// Vultr API key.
     #[arg(long, env = "VULTR_API_KEY", default_value = "")]
@@ -594,7 +598,7 @@ async fn main() -> Result<()> {
         ovh_app_key: opt(&cli.ovh_app_key),
         ovh_app_secret: opt(&cli.ovh_app_secret),
         ovh_consumer_key: opt(&cli.ovh_consumer_key),
-        ovh_subsidiary: None, // Not exposed via CLI yet
+        ovh_subsidiary: opt(&cli.ovh_subsidiary),
         vultr_api_key: opt(&cli.vultr_api_key),
         scaleway_secret_key: opt(&cli.scaleway_secret_key),
         scaleway_org_id: opt(&cli.scaleway_org_id),

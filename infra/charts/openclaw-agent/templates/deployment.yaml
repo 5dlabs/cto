@@ -1005,6 +1005,12 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: ovh-consumer-key
                   optional: true
+            - name: OVH_SUBSIDIARY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: ovh-subsidiary
+                  optional: true
             - name: OVH_ENDPOINT
               valueFrom:
                 secretKeyRef:

@@ -30,6 +30,12 @@ spec:
       protocol: TCP
       name: code-server
     {{- end }}
+    {{- if .Values.remoteDesktop.enabled }}
+    - port: {{ .Values.remoteDesktop.servicePort | default .Values.remoteDesktop.port | default 6901 }}
+      targetPort: remote-desktop
+      protocol: TCP
+      name: remote-desktop
+    {{- end }}
     {{- if .Values.devServer.enabled }}
     - port: {{ .Values.devServer.port | default 3000 }}
       targetPort: {{ .Values.devServer.port | default 3000 }}
